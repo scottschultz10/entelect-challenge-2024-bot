@@ -22,7 +22,8 @@ var botNickname =
 
 var token =
     Environment.GetEnvironmentVariable("Token") ??
-    Environment.GetEnvironmentVariable("REGISTRATION_TOKEN");
+    Environment.GetEnvironmentVariable("REGISTRATION_TOKEN") ?? 
+    Guid.NewGuid().ToString();
 
 var port = configuration.GetSection("RunnerPort");
 
@@ -34,7 +35,7 @@ var connection = new HubConnectionBuilder()
     .WithAutomaticReconnect()
     .Build();
 
-connection.StartAsync();
+await connection.StartAsync();
 
 Console.WriteLine("Connected to Runner");
 
@@ -66,7 +67,7 @@ connection.Closed += (error) =>
     return Task.CompletedTask;
 };
 
-connection.InvokeAsync("Register", token, botNickname);
+await connection.InvokeAsync("Register", token, botNickname);
 
 while (connection.State is HubConnectionState.Connected or HubConnectionState.Connecting)
 {
