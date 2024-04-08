@@ -4,14 +4,10 @@ using Microsoft.Extensions.Logging;
 using SproutReferenceBot.Models;
 using SproutReferenceBot.Services;
 
-string executableDirectory = AppDomain.CurrentDomain.BaseDirectory;
-// Set up configuration sources.
-var builder = new ConfigurationBuilder()
-    .SetBasePath(executableDirectory + "../../../")
-    .AddJsonFile(
+var builder = new ConfigurationBuilder().AddJsonFile(
     $"appsettings.json",
-    optional: false);
-
+    optional: false
+);
 
 var configuration = builder.Build();
 var environmentIp = Environment.GetEnvironmentVariable("RUNNER_IPV4");
