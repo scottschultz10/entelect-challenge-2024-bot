@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "SproutReferenceBot": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "Token": "1fe1f563-6cab-4eed-8e64-78d7aea1d503",
+        "BOT_NICKNAME": "Botato"
+      }
+    }
+  }
+}

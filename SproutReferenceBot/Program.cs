@@ -4,10 +4,14 @@ using Microsoft.Extensions.Logging;
 using SproutReferenceBot.Models;
 using SproutReferenceBot.Services;
 
-var builder = new ConfigurationBuilder().AddJsonFile(
+string executableDirectory = AppDomain.CurrentDomain.BaseDirectory;
+// Set up configuration sources.
+var builder = new ConfigurationBuilder()
+    .SetBasePath(executableDirectory + "../../../")
+    .AddJsonFile(
     $"appsettings.json",
-    optional: false
-);
+    optional: false);
+
 
 var configuration = builder.Build();
 var environmentIp = Environment.GetEnvironmentVariable("RUNNER_IPV4");
@@ -22,8 +26,7 @@ var botNickname =
 
 var token =
     Environment.GetEnvironmentVariable("Token") ??
-    Environment.GetEnvironmentVariable("REGISTRATION_TOKEN") ?? 
-    Guid.NewGuid().ToString();
+    Environment.GetEnvironmentVariable("REGISTRATION_TOKEN");
 
 var port = configuration.GetSection("RunnerPort");
 
@@ -40,7 +43,7 @@ await connection.StartAsync();
 Console.WriteLine("Connected to Runner");
 
 var botService = new BotService();
-connection.On<Guid>("Registered", (id) => { botService.SetBotId(id); });
+connection.On<Guid>("Registered", (id) => { Console.WriteLine($"Registered: {id}"); botService.SetBotId(id); });
 
 connection.On<String>(
     "Disconnect",
@@ -55,9 +58,9 @@ connection.On<BotStateDTO>(
     "ReceiveBotState",
     (botState) =>
     {
-        BotCommand command = botService.ProcessState(botState);
-        Console.WriteLine($"Sending {command.Action}");
-        connection.InvokeAsync("SendPlayerCommand", command);
+        //BotCommand command = botService.ProcessState(botState);
+        Console.WriteLine($"Sending something random UP");
+        connection.InvokeAsync("SendPlayerCommand", new BotCommand() { BotId = botService.GetBotId(), Action = SproutReferenceBot.Enums.BotAction.Up });
     }
 );
 
@@ -67,9 +70,22 @@ connection.Closed += (error) =>
     return Task.CompletedTask;
 };
 
+Console.WriteLine($"Token: {token}");
+Console.WriteLine($"BotNickname: {botNickname}");
+Console.WriteLine($"Connection ID: {connection.ConnectionId}");
+Console.WriteLine($"Connection state: {connection.State}");
+Console.WriteLine($"URL: {url}");
+Console.WriteLine($"environmentIp: {environmentIp}");
+
 await connection.InvokeAsync("Register", token, botNickname);
 
 while (connection.State is HubConnectionState.Connected or HubConnectionState.Connecting)
 {
-    Thread.Sleep(300);
+    var state = botService.GetBotState();
+    var botId = botService.GetBotId();
+    if (state == null || botId == null)
+    {
+        continue;
+    }
+    Console.WriteLine($"In while connected: {botId}, ({state.X}, {state.Y})");
 }

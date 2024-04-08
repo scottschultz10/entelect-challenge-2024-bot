@@ -6,6 +6,7 @@ namespace SproutReferenceBot.Services;
   {
     private Guid BotId;
     private BotStateDTO LastKnownState;
+    private BotStateDTO BotState;
     
     private static readonly int SquareSize = 5;
 
@@ -41,4 +42,19 @@ namespace SproutReferenceBot.Services;
     {
       BotId = NewBotId;
     }
-  }
+
+    public Guid GetBotId()
+    {
+        return BotId;
+    }
+
+    public void SetBotState(BotStateDTO botState)
+    {
+        this.BotState = botState;
+    }
+
+    public BotStateDTO GetBotState()
+    {
+        return BotState;
+    }
+}
