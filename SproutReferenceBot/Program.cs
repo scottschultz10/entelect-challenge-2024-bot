@@ -34,12 +34,17 @@ var connection = new HubConnectionBuilder()
     .WithAutomaticReconnect()
     .Build();
 
-await connection.StartAsync();
+_ = connection.StartAsync();
 
 Console.WriteLine("Connected to Runner");
 
 var botService = new BotService();
-connection.On<Guid>("Registered", (id) => { Console.WriteLine($"Registered: {id}"); botService.SetBotId(id); });
+connection.On<Guid>("Registered",
+    (id) =>
+    {
+        Console.WriteLine($"Registered: {id}");
+        botService.SetBotId(id);
+    });
 
 connection.On<String>(
     "Disconnect",
@@ -54,11 +59,25 @@ connection.On<BotStateDTO>(
     "ReceiveBotState",
     (botState) =>
     {
-        //BotCommand command = botService.ProcessState(botState);
-        Console.WriteLine($"Sending something random UP");
-        connection.InvokeAsync("SendPlayerCommand", new BotCommand() { BotId = botService.GetBotId(), Action = SproutReferenceBot.Enums.BotAction.Up });
+        botService.SetBotState(botState);
+        Console.WriteLine("ReceiveBotState");
     }
 );
+
+connection.On<string>(
+    "ReceiveGameComplete",
+    (state) =>
+    {
+        Console.WriteLine($"Game Complete : {state}");
+    });
+
+
+connection.On<Guid>(
+    "EndGame",
+    (state) =>
+    {
+        Console.WriteLine($"End Game: {state}");
+    });
 
 connection.Closed += (error) =>
 {
@@ -73,15 +92,28 @@ Console.WriteLine($"Connection state: {connection.State}");
 Console.WriteLine($"URL: {url}");
 Console.WriteLine($"environmentIp: {environmentIp}");
 
-await connection.InvokeAsync("Register", token, botNickname);
+_ = connection.InvokeAsync("Register", token, botNickname);
 
-while (connection.State is HubConnectionState.Connected or HubConnectionState.Connecting)
+while (connection.State == HubConnectionState.Connected || connection.State == HubConnectionState.Connecting)
 {
+    await Task.Delay(100);
+
     var state = botService.GetBotState();
     var botId = botService.GetBotId();
-    if (state == null || botId == null)
+
+    Console.WriteLine($"In while bot state = {state == null} / connection state {connection.State} / has received state{botService.HasReceivedBotState()}");
+
+    if (state == null)
     {
         continue;
     }
+
+    if (botService.HasReceivedBotState())
+    {
+        _ = connection.InvokeAsync("SendPlayerCommand", botService.ProcessState());
+    }
+
     Console.WriteLine($"In while connected: {botId}, ({state.X}, {state.Y})");
 }
+
+_ = connection.StopAsync();
