@@ -64,6 +64,6 @@ class BotService
 
     public bool HasReceivedBotState()
     {
-        return hasReceivedBotState;
+        return botState != null && hasReceivedBotState;
     }
 }

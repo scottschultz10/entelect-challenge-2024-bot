@@ -48,10 +48,10 @@ connection.On<Guid>("Registered",
 
 connection.On<String>(
     "Disconnect",
-    async (reason) =>
+    (reason) =>
     {
         Console.WriteLine($"Server sent disconnect with reason: {reason}");
-        await connection.StopAsync();
+        _ = connection.StopAsync();
     }
 );
 
@@ -72,7 +72,7 @@ connection.On<string>(
     });
 
 
-connection.On<Guid>(
+connection.On<object>(
     "EndGame",
     (state) =>
     {
@@ -85,35 +85,20 @@ connection.Closed += (error) =>
     return Task.CompletedTask;
 };
 
-Console.WriteLine($"Token: {token}");
-Console.WriteLine($"BotNickname: {botNickname}");
-Console.WriteLine($"Connection ID: {connection.ConnectionId}");
-Console.WriteLine($"Connection state: {connection.State}");
-Console.WriteLine($"URL: {url}");
-Console.WriteLine($"environmentIp: {environmentIp}");
-
 _ = connection.InvokeAsync("Register", token, botNickname);
 
 while (connection.State == HubConnectionState.Connected || connection.State == HubConnectionState.Connecting)
 {
-    await Task.Delay(100);
+    await Task.Delay(200);
 
-    var state = botService.GetBotState();
-    var botId = botService.GetBotId();
-
-    Console.WriteLine($"In while bot state = {state == null} / connection state {connection.State} / has received state{botService.HasReceivedBotState()}");
-
-    if (state == null)
+    if (botService.HasReceivedBotState() && connection.State == HubConnectionState.Connected)
     {
-        continue;
-    }
+        var state = botService.GetBotState();
 
-    if (botService.HasReceivedBotState())
-    {
-        _ = connection.InvokeAsync("SendPlayerCommand", botService.ProcessState());
+        BotCommand command = botService.ProcessState();
+        _ = connection.InvokeAsync("SendPlayerCommand", command);
+        Console.WriteLine($"Sending Player Command: ({state?.X}, {state?.Y}), {command.Action}");
     }
-
-    Console.WriteLine($"In while connected: {botId}, ({state.X}, {state.Y})");
 }
 
 _ = connection.StopAsync();
