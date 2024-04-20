@@ -7,11 +7,13 @@ class BotService
     private Guid botId;
     private BotStateDTO? lastKnownState;
     private BotStateDTO? botState;
+    private readonly BotView botView;
+
     private bool hasReceivedBotState = false;
 
-    private static readonly int SquareSize = 5;
+    private static readonly int squareSize = 5;
 
-    private static readonly BotAction[] ActionOrder = new[]
+    private static readonly BotAction[] actionOrder = new[]
     {
       BotAction.Up,
       BotAction.Right,
@@ -22,15 +24,20 @@ class BotService
     private int CurrentAction = 0;
     private int StepsTaken = 0;
 
+    public BotService()
+    {
+        botView = new();
+    }
+
     public BotCommand ProcessState()
     {
-        if (StepsTaken++ >= SquareSize)
+        if (StepsTaken++ >= squareSize)
         {
-            CurrentAction = (CurrentAction + 1) % ActionOrder.Length;
+            CurrentAction = (CurrentAction + 1) % actionOrder.Length;
             StepsTaken = 0;
         }
 
-        var ActionToTake = ActionOrder[CurrentAction];
+        var ActionToTake = actionOrder[CurrentAction];
 
 
         hasReceivedBotState = false;
@@ -54,6 +61,7 @@ class BotService
     public void SetBotState(BotStateDTO botState)
     {
         this.botState = botState;
+        this.botView.SetBotView(botState);
         hasReceivedBotState = true;
     }
 
@@ -65,5 +73,10 @@ class BotService
     public bool HasReceivedBotState()
     {
         return botState != null && hasReceivedBotState;
+    }
+
+    public string PrintBotView()
+    {
+        return botView.PrintBotView();
     }
 }

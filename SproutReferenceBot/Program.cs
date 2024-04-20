@@ -60,7 +60,11 @@ connection.On<BotStateDTO>(
     (botState) =>
     {
         botService.SetBotState(botState);
-        Console.WriteLine("ReceiveBotState");
+
+        Console.WriteLine("========");
+        Console.WriteLine(botState.PrintBotState());
+        Console.WriteLine(botService.PrintBotView());
+        Console.WriteLine("========");
     }
 );
 
@@ -81,7 +85,7 @@ connection.On<object>(
 
 connection.Closed += (error) =>
 {
-    Console.WriteLine($"Server closed with error: {error}");
+    Console.WriteLine($"Server closed with error: {error?.Message}");
     return Task.CompletedTask;
 };
 
@@ -89,7 +93,7 @@ _ = connection.InvokeAsync("Register", token, botNickname);
 
 while (connection.State == HubConnectionState.Connected || connection.State == HubConnectionState.Connecting)
 {
-    await Task.Delay(200);
+    await Task.Delay(50);
 
     if (botService.HasReceivedBotState() && connection.State == HubConnectionState.Connected)
     {
