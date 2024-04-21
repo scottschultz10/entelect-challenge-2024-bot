@@ -8,6 +8,7 @@ class BotService
     private BotStateDTO? lastKnownState;
     private BotStateDTO? botState;
     private readonly BotView botView;
+    private CellType myTerritory;
 
     private bool hasReceivedBotState = false;
 
@@ -31,6 +32,9 @@ class BotService
 
     public BotCommand ProcessState()
     {
+        //find a corner that matches myTerritory
+        CellView? cornerCell = CellFinder.FindCornerCell(botView.GetBotView(), CellFinder.GetClockwiseView(botView.GetBotView()), myTerritory);
+
         if (StepsTaken++ >= squareSize)
         {
             CurrentAction = (CurrentAction + 1) % actionOrder.Length;
@@ -63,6 +67,11 @@ class BotService
         this.botState = botState;
         this.botView.SetBotView(botState);
         hasReceivedBotState = true;
+
+        if (botState.DirectionState == BotAction.IDLE)
+        {
+            myTerritory = botView.GetBotView()[4][4].CellType;
+        }
     }
 
     public BotStateDTO? GetBotState()

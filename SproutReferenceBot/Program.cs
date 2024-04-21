@@ -46,7 +46,7 @@ connection.On<Guid>("Registered",
         botService.SetBotId(id);
     });
 
-connection.On<String>(
+connection.On<string>(
     "Disconnect",
     (reason) =>
     {
@@ -62,9 +62,8 @@ connection.On<BotStateDTO>(
         botService.SetBotState(botState);
 
         Console.WriteLine("========");
-        Console.WriteLine(botState.PrintBotState());
-        Console.WriteLine(botService.PrintBotView());
-        Console.WriteLine("========");
+        //Console.WriteLine(botState.PrintBotState());
+        //Console.WriteLine(botService.PrintBotView());
     }
 );
 
@@ -75,8 +74,7 @@ connection.On<string>(
         Console.WriteLine($"Game Complete : {state}");
     });
 
-
-connection.On<object>(
+connection.On<string>(
     "EndGame",
     (state) =>
     {
@@ -93,16 +91,15 @@ _ = connection.InvokeAsync("Register", token, botNickname);
 
 while (connection.State == HubConnectionState.Connected || connection.State == HubConnectionState.Connecting)
 {
-    await Task.Delay(50);
-
     if (botService.HasReceivedBotState() && connection.State == HubConnectionState.Connected)
     {
-        var state = botService.GetBotState();
-
         BotCommand command = botService.ProcessState();
+
+        Console.WriteLine(botService.PrintBotView());
+
         _ = connection.InvokeAsync("SendPlayerCommand", command);
-        Console.WriteLine($"Sending Player Command: ({state?.X}, {state?.Y}), {command.Action}");
+        Console.WriteLine($"Sending Player Command: {command.Action}");
     }
 }
 
-_ = connection.StopAsync();
+await connection.StopAsync();
