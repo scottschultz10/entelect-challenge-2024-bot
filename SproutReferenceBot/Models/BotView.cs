@@ -12,16 +12,17 @@ namespace SproutReferenceBot.Models
     /// </summary>
     public class BotView
     {
-        private List<List<CellView>> cellViews;
+        private List<List<BotViewCell>> cells;
+        public List<List<BotViewCell>> Cells { get { return cells; } }
 
         public BotView()
         {
-            cellViews = new();
+            cells = new();
         }
 
         public void SetBotView(BotStateDTO botState)
         {
-            cellViews = new();
+            cells = new();
 
             //my bot will always be in 4, 4. So populate X,Y based on that
             int botX = botState.X;
@@ -29,7 +30,7 @@ namespace SproutReferenceBot.Models
 
             for (int y = 0; y < botState.HeroWindow?.Count; y++)
             {
-                cellViews.Add(new());
+                cells.Add(new());
                 for (int x = 0; x < botState.HeroWindow[y].Count; x++)
                 {
                     int cellY = botY + (y - 4);
@@ -44,7 +45,7 @@ namespace SproutReferenceBot.Models
 
                     PowerUpType powerUpType = botState.PowerUpLocations?.FirstOrDefault(x => x.Location == new Location(cellX, cellY))?.Type ?? PowerUpType.NONE;
 
-                    cellViews[y].Add(new()
+                    cells[y].Add(new()
                     {
                         Location = new (cellX, cellY),
                         Index = new (x, y),
@@ -58,20 +59,46 @@ namespace SproutReferenceBot.Models
             }
         }
 
-        public List<List<CellView>> GetBotView()
+        public BotViewCell GetCenterCell()
         {
-            return cellViews;
+            return cells[(cells.Count - 1) / 2][(cells[0].Count - 1) / 2];
+        }
+
+
+        /// <summary>
+        /// Send in a location value and find the associated cell in the BotView
+        /// </summary>
+        /// <param name="location"></param>
+        /// <returns>The BotViewCell associated with the sent in location. If no location is found return null</returns>
+        public BotViewCell? GetCellByLocation(Location location)
+        {
+            //get the top-left cell and bottom-right cell as a reference / validation
+            BotViewCell topLeft = cells[0][0];
+            BotViewCell bottomRight = cells[cells.Count - 1][cells[0].Count - 1];
+
+            //so if the location has any X / Y value lower than the topLeft
+            // or the location has any X / Y value higher than the bottomRight
+            if (topLeft.Location.X > location.X || location.X > bottomRight.Location.X
+                || topLeft.Location.Y > location.Y || location.Y > bottomRight.Location.Y)
+            {
+                return null;
+            }
+
+            //find how far away location is from 0,0
+            //the difference is the index in the cells list
+            Location index = location.Difference(topLeft.Location);
+            return cells[index.X][index.Y];
         }
 
         public string PrintBotView()
         {
             StringBuilder builder = new();
 
-            if (cellViews.Any())
+            if (cells.Count > 0)
             {
-                for (int x = 0; x < cellViews.Count; x++)
+                for (int x = 0; x < cells.Count; x++)
                 {
-                    List<CellView> viewRow = cellViews[x];
+                    List<BotViewCell> viewRow = cells[x];
 
                     string locations = AddLineToTable(viewRow.Select(y => $"{y.Location},{(y.IsMe ? " <- ME" : string.Empty)}").ToList());
                     string cellTypes = AddLineToTable(viewRow.Select(y => y.CellType.ToString()).ToList());
@@ -121,20 +148,4 @@ namespace SproutReferenceBot.Models
         }
     }
 
-    public class CellView
-    {
-        public Location Location { get; set; }
-        public Location Index { get; set; }
-        public bool HasBot { get; set; }
-        public bool IsMe { get; set; }
-        public bool HasWeed { get; set; }
-        public CellType CellType { get; set; }
-        public PowerUpType PowerUpType { get; set; }
-
-        public CellView()
-        {
-            Location = new();
-            Index = new();
-        }
-    }
 }

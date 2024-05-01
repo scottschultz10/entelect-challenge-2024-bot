@@ -95,10 +95,9 @@ while (connection.State == HubConnectionState.Connected || connection.State == H
     {
         BotCommand command = botService.ProcessState();
 
-        Console.WriteLine(botService.PrintBotView());
+        //Console.WriteLine(botService.PrintBotView());
 
         _ = connection.InvokeAsync("SendPlayerCommand", command);
-        Console.WriteLine($"Sending Player Command: {command.Action}");
     }
 }
 
