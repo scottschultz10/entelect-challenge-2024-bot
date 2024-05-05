@@ -48,7 +48,6 @@ namespace SproutReferenceBot.Models
                     cells[x].Add(new()
                     {
                         Location = new (cellX, cellY),
-                        Index = new (x, y),
                         IsMe = isMe,
                         HasBot = hasBot && !isMe,
                         HasWeed = hasWeed,

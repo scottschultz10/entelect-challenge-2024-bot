@@ -10,74 +10,130 @@ namespace SproutReferenceBot.Services
 {
     public static class BotMovementService
     {
-       
-        public static List<MovementAction> MoveToDestination(Location current, Location destination, BotView botView)
+
+        public static List<MovementAction> MoveToDestination(Location current, Location destination, BotView botView, BotAction currentDirection, RotationDirection? captureRotation, Location movementOffset)
         {
             //make the basic movement first
-            Location difference = current.Difference(destination);
+            Location difference = current.Difference(destination.Move(movementOffset));
             Location currentLocation = current;
+            BotAction lastDirection = currentDirection;
 
-            Console.WriteLine($"Moving to Destination {destination} ->  Difference : {difference}");
-
-            List <MovementAction> movementList = new();
+            List<MovementAction> movementList = new();
 
             while (difference != LocationDirection.NONE)
             {
-                //x first
-                if (difference.X > 0)
+                bool hasMoved = false;
+
+                //y first
+                if (difference.Y > 0 && lastDirection != BotAction.Down)
                 {
                     difference = difference.Move(LocationDirection.Up);
                     currentLocation = currentLocation.Move(LocationDirection.Up);
 
                     movementList.Add(new(BotAction.Up, currentLocation));
+                    lastDirection = BotAction.Up;
+                    hasMoved = true;
                 }
-                else if (difference.X < 0)
+                else if (difference.Y < 0 && lastDirection != BotAction.Up)
                 {
                     difference = difference.Move(LocationDirection.Down);
                     currentLocation = currentLocation.Move(LocationDirection.Down);
 
                     movementList.Add(new(BotAction.Down, currentLocation));
+                    lastDirection = BotAction.Down;
+                    hasMoved = true;
                 }
                 //else difference == 0 / do nothing - at destination X
 
-                //then y
-                if (difference.Y > 0)
+                //then x
+                if (difference.X > 0 && lastDirection != BotAction.Right)
                 {
                     difference = difference.Move(LocationDirection.Left);
                     currentLocation = currentLocation.Move(LocationDirection.Left);
 
                     movementList.Add(new(BotAction.Left, currentLocation));
+                    lastDirection = BotAction.Left;
+                    hasMoved = true;
                 }
-                else if (difference.Y < 0)
+                else if (difference.X < 0 && lastDirection != BotAction.Left)
                 {
                     difference = difference.Move(LocationDirection.Right);
                     currentLocation = currentLocation.Move(LocationDirection.Right);
 
                     movementList.Add(new(BotAction.Right, currentLocation));
+                    lastDirection = BotAction.Right;
+                    hasMoved = true;
                 }
                 //else difference == 0 / do nothing - at destination Y
+
+                if (!hasMoved && difference != LocationDirection.NONE)
+                {
+                    Location fixDirection;
+                    if (captureRotation == RotationDirection.CounterClockwise)
+                    {
+                        fixDirection = lastDirection.ToLocationDirection().NextCounterClockwiseDirection();
+                    }
+                    else
+                    {
+                        fixDirection = lastDirection.ToLocationDirection().NextClockwiseDirection();
+                    }
+
+                    difference = difference.Move(fixDirection);
+                    currentLocation = currentLocation.Move(fixDirection);
+
+                    movementList.Add(new(fixDirection.ToBotAction(), currentLocation));
+                    lastDirection = fixDirection.ToBotAction();
+                }
             }
 
             //then check hazards on trail / and avoid
+            if (movementList.Count > 0 && !AreMovementActionsSafe(movementList, botView))
+            {
+                //go the opposite direction of the rotation
+                //offset by the most common direction
+                Location offset;
+                BotAction commonDirection = (from move in movementList
+                                             group move by move.Action into grp
+                                             select new
+                                             {
+                                                 grp.Key,
+                                                 Count = grp.Count(),
+                                             }).OrderByDescending(x => x.Count).First().Key;
 
-            Console.WriteLine($"... {string.Join("; ", movementList)}");
+                if (captureRotation == RotationDirection.Clockwise)
+                {
+                    offset = movementOffset.Move(commonDirection.ToLocationDirection().NextCounterClockwiseDirection());
+                }
+                else
+                {
+                    offset = movementOffset.Move(commonDirection.ToLocationDirection().NextClockwiseDirection());
+                }
 
-            return movementList;
+                Console.Write($"Offsetting the movement: {offset}");
+
+                return MoveToDestination(current, destination, botView, currentDirection, captureRotation, offset);
+            }
+            else
+            {
+                return movementList;
+            }
         }
 
-        public static List<MovementQueueItem> CaptureTerritory(CellFinderResult cellFinder, BotView botView)
+        public static List<MovementQueueItem> CaptureTerritory(CellFinderResult cellFinder, BotView botView, CellType myTerritory)
         {
             List<List<MovementQueueItem>> allQueues = new();
 
             foreach (CellFinderDirection direction in cellFinder.Directions)
             {
-                allQueues.Add(CaptureTerritoryQueue(botView, cellFinder.Cell.Location, direction));
+                allQueues.Add(CaptureTerritoryQueue(botView, cellFinder.Cell.Location, direction, myTerritory));
             }
 
             int maxIndex = 0;
             int maxDistance = 0;
             for (int i = 0; i < allQueues.Count; i++)
             {
+                Console.WriteLine($"action queue count: {allQueues[i].Count}");
+
                 int totalDistance = 0;
                 if (allQueues.Count > 1)
                 {
@@ -100,7 +156,7 @@ namespace SproutReferenceBot.Services
             return allQueues[maxIndex];
         }
 
-        private static List<MovementQueueItem> CaptureTerritoryQueue(BotView botView, Location cell, CellFinderDirection direction)
+        private static List<MovementQueueItem> CaptureTerritoryQueue(BotView botView, Location cell, CellFinderDirection direction, CellType myTerritory)
         {
             List<MovementQueueItem> destinationList = new();
 
@@ -109,7 +165,7 @@ namespace SproutReferenceBot.Services
 
             int directionMax = 4;
 
-            for (int directionChangeCount = 0;  directionChangeCount < 4; directionChangeCount++)
+            for (int directionChangeCount = 0; directionChangeCount < 4; directionChangeCount++)
             {
                 //increase the max to avoid colliding with ourselves
                 if (directionChangeCount == 2)
@@ -117,23 +173,41 @@ namespace SproutReferenceBot.Services
                     directionMax++;
                 }
 
+                List<(Location Location, BotViewCell? Cell)?> cells = new();
+                for (int i = 1; i <= directionMax; i++)
+                {
+                    Location cellLocation = currentLocation.Move(currentDirection, i);
+                    cells.Add((cellLocation, botView.GetCellByLocation(cellLocation)));
+                }
+
                 //find a valid destination
-                int directionMagnitude = directionMax;
-                Location tempLocation = currentLocation.Move(currentDirection, directionMagnitude);
-
                 //stay in bounds
-                while(botView.GetCellByLocation(tempLocation)?.CellType == CellType.OutOfBounds && directionMagnitude > 1)
+                Location tempLocation;
+
+                if (cells.Any(x => x?.Cell?.CellType == CellType.OutOfBounds))
                 {
-                    directionMagnitude--;
-                    tempLocation = currentLocation.Move(currentDirection, directionMagnitude);
+                    tempLocation = cells.LastOrDefault(x => x?.Cell?.CellType != CellType.OutOfBounds)?.Location ?? currentLocation;
+                }
+                else if (cells.Any(x => x?.Cell?.CellType == myTerritory))
+                {
+                    tempLocation = cells.LastOrDefault(x => x?.Cell?.CellType == myTerritory)?.Location ?? currentLocation;
+                }
+                else
+                {
+                    tempLocation = cells.LastOrDefault()?.Location ?? currentLocation;
                 }
 
-                if (tempLocation != currentDirection)
+                if (botView.GetCellByLocation(tempLocation)?.CellType != CellType.OutOfBounds && tempLocation != currentDirection)
                 {
-                    destinationList.Add(new(tempLocation) { CaptureRotation = direction.Rotation});
-                }
+                    destinationList.Add(new(tempLocation, new(currentDirection, direction.Rotation)));
+                    currentLocation = tempLocation;
 
-                currentLocation = tempLocation;
+                    //we have hit myTerritory, stop capturing
+                    if (botView.GetCellByLocation(currentLocation)?.CellType == myTerritory)
+                    {
+                        break;
+                    }
+                }
 
                 //change the direction
                 if (direction.Rotation == RotationDirection.Clockwise)
@@ -158,7 +232,7 @@ namespace SproutReferenceBot.Services
 
             int directionMagnitude = 4;
             Location tempLocation = currentLocation.Move(cellFinder.Directions.First().Direction, directionMagnitude);
-            
+
             //stay in bounds
             while (botView.GetCellByLocation(tempLocation)?.CellType != myTerritory && directionMagnitude > 1)
             {
@@ -166,7 +240,7 @@ namespace SproutReferenceBot.Services
                 tempLocation = currentLocation.Move(cellFinder.Directions.First().Direction, directionMagnitude);
             }
 
-            return new() { new(tempLocation) };
+            return new() { new(tempLocation, cellFinder.Directions.First()) };
         }
 
         public static bool CanMove(this BotAction currentDirection, BotAction newDirection)
@@ -182,9 +256,9 @@ namespace SproutReferenceBot.Services
 
         }
 
-        public static bool AreMovementActionsSafe(this List<MovementAction> actions)
+        public static bool AreMovementActionsSafe(this List<MovementAction> actions, BotView botView)
         {
-            return true;
+            return !actions.Any(x => x.GetBotViewCell(botView)?.HasWeed == true);
         }
 
     }

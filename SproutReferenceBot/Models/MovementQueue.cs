@@ -11,12 +11,12 @@ namespace SproutReferenceBot.Models
     {
         public Location Destination { get; set; }
         public List<MovementAction> Actions { get; set; }
-        public RotationDirection? CaptureRotation { get; set; }
+        public CellFinderDirection Direction { get; set; }
 
-        public MovementQueueItem(Location destination)
+        public MovementQueueItem(Location destination, CellFinderDirection direction)
         {
             Destination = destination;
-            CaptureRotation = null;
+            Direction = direction;
             Actions = new();
         }
     }

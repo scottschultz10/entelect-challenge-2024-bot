@@ -58,21 +58,21 @@ namespace SproutReferenceBot.Models
     public static class LocationDirection
     {
         /// <summary>
-        /// (0, 1)
-        /// </summary>
-        public static readonly Location Right = new(0, 1);
-        /// <summary>
         /// (1, 0)
         /// </summary>
-        public static readonly Location Down = new(1, 0);
+        public static readonly Location Right = new(1, 0);
         /// <summary>
-        /// (0, -1)
+        /// (0, 1)
         /// </summary>
-        public static readonly Location Left = new(0, -1);
+        public static readonly Location Down = new(0, 1);
         /// <summary>
         /// (-1, 0)
         /// </summary>
-        public static readonly Location Up = new(-1, 0);
+        public static readonly Location Left = new(-1, 0);
+        /// <summary>
+        /// (0, -1)
+        /// </summary>
+        public static readonly Location Up = new(0, -1);
 
         /// <summary>
         /// (0, 0)
@@ -199,11 +199,11 @@ namespace SproutReferenceBot.Models
             if (currentDirection == BotAction.Up)
             {
                 //don't want to move down (don't want to increase the X value)
-                if (difference.X < 0)
+                if (difference.Y < 0)
                 {
                     return 1;
                 }
-                else if (difference.X > 0)
+                else if (difference.Y > 0)
                 {
                     //keep going up
                     return -1;
@@ -213,11 +213,11 @@ namespace SproutReferenceBot.Models
             else if (currentDirection == BotAction.Down)
             {
                 //don't want to move up (don't want to decrease the X value)
-                if (difference.X > 0)
+                if (difference.Y > 0)
                 {
                     return 1;
                 }
-                else if (difference.X < 0)
+                else if (difference.Y < 0)
                 {
                     //keep going down
                     return -1;
@@ -227,11 +227,11 @@ namespace SproutReferenceBot.Models
             else if (currentDirection == BotAction.Left)
             {
                 //don't want to move right (don't want to increase the X value)
-                if (difference.Y < 0)
+                if (difference.X < 0)
                 {
                     return 1;
                 }
-                if (difference.Y > 0)
+                else if (difference.X > 0)
                 {
                     //keep going left
                     return -1;
@@ -241,11 +241,11 @@ namespace SproutReferenceBot.Models
             else if (currentDirection == BotAction.Right)
             {
                 //don't want to move left (don't want to decrease the X value)
-                if (difference.Y > 0)
+                if (difference.X > 0)
                 {
                     return 1;
                 }
-                else if (difference.Y < 0)
+                else if (difference.X < 0)
                 {
                     return -1;
                 }

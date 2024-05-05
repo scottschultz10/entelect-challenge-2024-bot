@@ -34,7 +34,7 @@ var connection = new HubConnectionBuilder()
     .WithAutomaticReconnect()
     .Build();
 
-_ = connection.StartAsync();
+await connection.StartAsync();
 
 Console.WriteLine("Connected to Runner");
 
@@ -87,7 +87,7 @@ connection.Closed += (error) =>
     return Task.CompletedTask;
 };
 
-_ = connection.InvokeAsync("Register", token, botNickname);
+await connection.InvokeAsync("Register", token, botNickname);
 
 while (connection.State == HubConnectionState.Connected || connection.State == HubConnectionState.Connecting)
 {
@@ -97,7 +97,7 @@ while (connection.State == HubConnectionState.Connected || connection.State == H
 
         //Console.WriteLine(botService.PrintBotView());
 
-        _ = connection.InvokeAsync("SendPlayerCommand", command);
+        await connection.InvokeAsync("SendPlayerCommand", command);
     }
 }
 

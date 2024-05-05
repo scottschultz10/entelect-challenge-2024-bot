@@ -16,20 +16,22 @@ namespace SproutReferenceBot.Services
         /// Build a 1 dimensional list of cellviews starting from the bot and spiralling outwards
         /// </summary>
         /// <returns>A 1 dimensional list of cellviews that gradually get further from the bot as the list continues</returns>
-        public static List<BotViewCell> GetClockwiseView(List<List<BotViewCell>> botView)
+        public static List<BotViewCell> GetClockwiseView(BotView botView)
         {
-            if (botView.Count == 0) return new();
+            if (botView.Cells.Count == 0) return new();
 
-            List<BotViewCell> clockwiseView = new() { botView[(botView.Count - 1) / 2][(botView[0].Count - 1) / 2] };
+            BotViewCell centerCell = botView.GetCenterCell();
 
-            Location currentIndex = new(4, 5);
+            List<BotViewCell> clockwiseView = new() { centerCell };
+
+            BotViewCell? currentCell = botView.GetCellByLocation(centerCell.Location.Move(LocationDirection.Right));
             Location currentDirection = LocationDirection.Down;
             int directionMax = 1;
             int directionCount = 0;
 
-            while (currentIndex.X < botView.Count && currentIndex.Y < botView[0].Count)
+            while (currentCell != null)
             {
-                clockwiseView.Add(botView[currentIndex.X][currentIndex.Y]);
+                clockwiseView.Add(currentCell);
 
                 if (directionCount >= directionMax)
                 {
@@ -47,7 +49,7 @@ namespace SproutReferenceBot.Services
                 }
 
                 directionCount++;
-                currentIndex = currentIndex.Move(currentDirection);
+                currentCell = botView.GetCellByLocation(currentCell.Location.Move(currentDirection));
             }
 
             return clockwiseView;
@@ -61,9 +63,6 @@ namespace SproutReferenceBot.Services
         /// <returns>Null if no corner found in the botView</returns>
         public static CellFinderResult? FindCornerCell(BotView botView, List<BotViewCell> clockwiseView, CellType myTerritory, BotAction currentDirection)
         {
-            int xCount = botView.Cells.Count;
-            int yCount = botView.Cells[0].Count;
-
             BotViewCell centerCell = botView.GetCenterCell();
 
             //find multiple corners and prioritise
@@ -71,27 +70,18 @@ namespace SproutReferenceBot.Services
 
             foreach (BotViewCell cell in clockwiseView)
             {
-                Location rightIndex = cell.Index.Move(LocationDirection.Right);
-                Location downIndex = cell.Index.Move(LocationDirection.Down);
-                Location leftIndex = cell.Index.Move(LocationDirection.Left);
-                Location upIndex = cell.Index.Move(LocationDirection.Up);
+                BotViewCell? rightCell = botView.GetCellByLocation(cell.Location.Move(LocationDirection.Right));
+                BotViewCell? downCell = botView.GetCellByLocation(cell.Location.Move(LocationDirection.Down));
+                BotViewCell? leftCell = botView.GetCellByLocation(cell.Location.Move(LocationDirection.Left));
+                BotViewCell? upCell = botView.GetCellByLocation(cell.Location.Move(LocationDirection.Up));
 
-                //validate that all cells are within the view
-                if (!IsIndexInBounds(rightIndex, xCount, yCount)
-                    || !IsIndexInBounds(downIndex, xCount, yCount)
-                    || !IsIndexInBounds(leftIndex, xCount, yCount)
-                    || !IsIndexInBounds(leftIndex, xCount, yCount))
+                if (rightCell == null || downCell == null || leftCell == null || upCell == null)
                 {
-                    //the directions are no longer in bounds. There are no corners within view
+                    //the directions are no longer in bounds. There are no lines within view
                     break;
                 }
 
-                CellType rightType = botView.Cells[rightIndex.X][rightIndex.Y].CellType;
-                CellType downType = botView.Cells[downIndex.X][downIndex.Y].CellType;
-                CellType leftType = botView.Cells[leftIndex.X][leftIndex.Y].CellType;
-                CellType upType = botView.Cells[upIndex.X][upIndex.Y].CellType;
-
-                CellType[] validateSideTypes = { rightType, downType, leftType, upType };
+                CellType[] validateSideTypes = { rightCell.CellType, downCell.CellType, leftCell.CellType, upCell.CellType };
                 /*
                  * Not valid when:
                  * if 2 of the sides are out of bounds. Corner of map
@@ -108,7 +98,7 @@ namespace SproutReferenceBot.Services
                 CellFinderResult cellFinder = new(cell, priority);
 
                 //check that this cell has two adjacent cells that are myTerritory and the other 2 are not
-                if (rightType == myTerritory && downType == myTerritory && leftType != myTerritory && upType != myTerritory)
+                if (rightCell.CellType == myTerritory && downCell.CellType == myTerritory && leftCell.CellType != myTerritory && upCell.CellType != myTerritory)
                 {
                     cellFinder.Directions = new()
                     {
@@ -119,7 +109,7 @@ namespace SproutReferenceBot.Services
                     //right-down corner
                     allCorners.Add(cellFinder);
                 }
-                else if (rightType != myTerritory && downType == myTerritory && leftType == myTerritory && upType != myTerritory)
+                else if (rightCell.CellType != myTerritory && downCell.CellType == myTerritory && leftCell.CellType == myTerritory && upCell.CellType != myTerritory)
                 {
                     //down-left corner
                     cellFinder.Directions = new()
@@ -130,7 +120,7 @@ namespace SproutReferenceBot.Services
 
                     allCorners.Add(cellFinder);
                 }
-                else if (rightType != myTerritory && downType != myTerritory && leftType == myTerritory && upType == myTerritory)
+                else if (rightCell.CellType != myTerritory && downCell.CellType != myTerritory && leftCell.CellType == myTerritory && upCell.CellType == myTerritory)
                 {
                     //left-up corner
                     cellFinder.Directions = new()
@@ -141,7 +131,7 @@ namespace SproutReferenceBot.Services
 
                     allCorners.Add(cellFinder);
                 }
-                else if (rightType == myTerritory && downType != myTerritory && leftType != myTerritory && upType == myTerritory)
+                else if (rightCell.CellType == myTerritory && downCell.CellType != myTerritory && leftCell.CellType != myTerritory && upCell.CellType == myTerritory)
                 {
                     //up-right corner
                     cellFinder.Directions = new()
@@ -159,7 +149,7 @@ namespace SproutReferenceBot.Services
             {
                 return allCorners.First(x => x.Cell.Location == centerCell.Location);
             }
-            else if (allCorners.Count > 1)
+            else if (allCorners.Count > 0)
             {
                 //group corners with the same priorities
                 //then pick a random corner from that group
@@ -183,59 +173,52 @@ namespace SproutReferenceBot.Services
         /// <returns></returns>
         public static CellFinderResult? FindLineCell(BotView botView, List<BotViewCell> clockwiseView, CellType myTerritory, BotAction currentDirection)
         {
-            int xCount = botView.Cells.Count;
-            int yCount = botView.Cells[0].Count;
-
             BotViewCell centerCell = botView.GetCenterCell();
 
             List<CellFinderResult> allLines = new();
 
             foreach (BotViewCell cell in clockwiseView)
             {
-                Location rightIndex = cell.Index.Move(LocationDirection.Right);
-                Location downIndex = cell.Index.Move(LocationDirection.Down);
-                Location leftIndex = cell.Index.Move(LocationDirection.Left);
-                Location upIndex = cell.Index.Move(LocationDirection.Up);
+                BotViewCell? rightCell = botView.GetCellByLocation(cell.Location.Move(LocationDirection.Right));
+                BotViewCell? downCell = botView.GetCellByLocation(cell.Location.Move(LocationDirection.Down));
+                BotViewCell? leftCell = botView.GetCellByLocation(cell.Location.Move(LocationDirection.Left));
+                BotViewCell? upCell = botView.GetCellByLocation(cell.Location.Move(LocationDirection.Up));
 
-                //validate that all cells are within the view
-                if (!IsIndexInBounds(rightIndex, xCount, yCount)
-                    || !IsIndexInBounds(downIndex, xCount, yCount)
-                    || !IsIndexInBounds(leftIndex, xCount, yCount)
-                    || !IsIndexInBounds(leftIndex, xCount, yCount))
+                if (rightCell == null || downCell == null || leftCell == null || upCell == null)
                 {
-                    //the directions are no longer in bounds. There are no corners within view
+                    //the directions are no longer in bounds. There are no lines within view
                     break;
                 }
-
-                CellType rightType = botView.Cells[rightIndex.X][rightIndex.Y].CellType;
-                CellType downType = botView.Cells[downIndex.X][downIndex.Y].CellType;
-                CellType leftType = botView.Cells[leftIndex.X][leftIndex.Y].CellType;
-                CellType upType = botView.Cells[upIndex.X][upIndex.Y].CellType;
 
                 CellFinderPriority priority = new(centerCell.Location.DistanceTo(cell.Location), centerCell.Location.DirectionPriority(cell.Location, currentDirection));
                 CellFinderResult cellFinder = new(cell, priority);
 
+                if (priority.DirectionValue > 0)
+                {
+                    continue;
+                }
+
                 //check that this cell has 3 adjacent cells that are myTerritory and the other 1 is not
-                if (rightType == myTerritory && downType == myTerritory && leftType == myTerritory && upType != myTerritory)
+                if (rightCell.CellType == myTerritory && downCell.CellType == myTerritory && leftCell.CellType == myTerritory && upCell.CellType != myTerritory)
                 {
                     //up empty line
                     cellFinder.Directions = [new CellFinderDirection(LocationDirection.Right, RotationDirection.CounterClockwise)];
 
                     allLines.Add(cellFinder);
                 }
-                else if (rightType != myTerritory && downType == myTerritory && leftType == myTerritory && upType == myTerritory)
+                else if (rightCell.CellType != myTerritory && downCell.CellType == myTerritory && leftCell.CellType == myTerritory && upCell.CellType == myTerritory)
                 {
                     //right empty line
                     cellFinder.Directions = [new CellFinderDirection(LocationDirection.Down, RotationDirection.Clockwise)];
                     allLines.Add(cellFinder);
                 }
-                else if (rightType == myTerritory && downType != myTerritory && leftType == myTerritory && upType == myTerritory)
+                else if (rightCell.CellType == myTerritory && downCell.CellType != myTerritory && leftCell.CellType == myTerritory && upCell.CellType == myTerritory)
                 {
                     //down empty line
                     cellFinder.Directions = [new CellFinderDirection(LocationDirection.Left, RotationDirection.CounterClockwise)];
                     allLines.Add(cellFinder);
                 }
-                else if (rightType == myTerritory && downType == myTerritory && leftType != myTerritory && upType == myTerritory)
+                else if (rightCell.CellType == myTerritory && downCell.CellType == myTerritory && leftCell.CellType != myTerritory && upCell.CellType == myTerritory)
                 {
                     //left empty line
                     cellFinder.Directions = [new CellFinderDirection(LocationDirection.Up, RotationDirection.Clockwise)];
@@ -245,15 +228,5 @@ namespace SproutReferenceBot.Services
 
             return allLines.OrderBy(x => x.Priority.DirectionValue).ThenBy(x => x.Priority.Distance).FirstOrDefault();
         }
-
-        /// <summary>
-        /// Check that the x and y values are within the range of: above or equal to 0 and below the Count of the list
-        /// </summary>
-        /// <returns>True if the index is valid and in bounds</returns>
-        private static bool IsIndexInBounds(Location index, int xCount, int yCount)
-        {
-            return 0 <= index.X && index.X < xCount && 0 <= index.Y && index.Y < yCount;
-        }
-
     }
 }
