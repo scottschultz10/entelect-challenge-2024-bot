@@ -1,4 +1,5 @@
 ﻿using SproutReferenceBot.Enums;
+using SproutReferenceBot.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -6,35 +7,10 @@ using System.Reflection.Metadata.Ecma335;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SproutReferenceBot.Models
+namespace SproutReferenceBot.Services
 {
-    public class CellFinderResult
-    {
-        public List<CellFinderDirection> Directions;
-        public CellFinderPriority Priority;
-        public BotViewCell Cell;
-
-        public CellFinderResult(BotViewCell cell, CellFinderPriority priority)
-        {
-            Cell = cell;
-            Priority = priority;
-            Directions = new();
-        }
-    }
-
-    public class CellFinderDirection(Location direction, RotationDirection rotation) 
-    {
-        public Location Direction = direction;
-        public RotationDirection Rotation = rotation;
-    }
-
-    public class CellFinderPriority(int distance, int directionValue)
-    {
-        public int Distance = distance;
-        public int DirectionValue = directionValue;
-    }
-
-    public static class CellFinder
+   
+    public static class CellFinderService
     {
         /// <summary>
         /// Build a 1 dimensional list of cellviews starting from the bot and spiralling outwards
@@ -120,7 +96,7 @@ namespace SproutReferenceBot.Models
                  * Not valid when:
                  * if 2 of the sides are out of bounds. Corner of map
                  * OR if there are not exactly 2 sides of myTerritory
-                 */ 
+                 */
                 if (validateSideTypes.Count(x => x == CellType.OutOfBounds) >= 2
                     || validateSideTypes.Count(x => x == myTerritory) != 2)
                 {
@@ -134,7 +110,7 @@ namespace SproutReferenceBot.Models
                 //check that this cell has two adjacent cells that are myTerritory and the other 2 are not
                 if (rightType == myTerritory && downType == myTerritory && leftType != myTerritory && upType != myTerritory)
                 {
-                    cellFinder.Directions = new() 
+                    cellFinder.Directions = new()
                     {
                         new CellFinderDirection(LocationDirection.Up, RotationDirection.Clockwise),
                         new CellFinderDirection(LocationDirection.Left, RotationDirection.CounterClockwise)
@@ -276,7 +252,7 @@ namespace SproutReferenceBot.Models
         /// <returns>True if the index is valid and in bounds</returns>
         private static bool IsIndexInBounds(Location index, int xCount, int yCount)
         {
-            return (0 <= index.X && index.X < xCount) && (0 <= index.Y && index.Y < yCount);
+            return 0 <= index.X && index.X < xCount && 0 <= index.Y && index.Y < yCount;
         }
 
     }

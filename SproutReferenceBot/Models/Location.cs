@@ -129,9 +129,9 @@ namespace SproutReferenceBot.Models
         /// Change the location by some magnitude of the location sent in
         /// </summary>
         /// <param name="location">Location data that will increment the X / Y value by some magnitude</param>
-        public static Location Move(this Location location, Location direction)
+        public static Location Move(this Location location, Location direction, int magnitude = 1)
         {
-            return new(location.X + direction.X, location.Y + direction.Y);
+            return new(location.X + (direction.X * magnitude), location.Y + (direction.Y * magnitude));
         }
 
         /// <summary>

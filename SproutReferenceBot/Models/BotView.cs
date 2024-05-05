@@ -28,10 +28,10 @@ namespace SproutReferenceBot.Models
             int botX = botState.X;
             int botY = botState.Y;
 
-            for (int y = 0; y < botState.HeroWindow?.Count; y++)
+            for (int x = 0; x < botState.HeroWindow?.Count; x++)
             {
                 cells.Add(new());
-                for (int x = 0; x < botState.HeroWindow[y].Count; x++)
+                for (int y = 0; y < botState.HeroWindow[x].Count; y++)
                 {
                     int cellY = botY + (y - 4);
                     int cellX = botX + (x - 4);
@@ -45,7 +45,7 @@ namespace SproutReferenceBot.Models
 
                     PowerUpType powerUpType = botState.PowerUpLocations?.FirstOrDefault(x => x.Location == new Location(cellX, cellY))?.Type ?? PowerUpType.NONE;
 
-                    cells[y].Add(new()
+                    cells[x].Add(new()
                     {
                         Location = new (cellX, cellY),
                         Index = new (x, y),

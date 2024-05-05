@@ -8,37 +8,39 @@ class BotService
     private BotStateDTO? botState;
     private readonly BotView botView;
     private CellType myTerritory;
-    private Queue<BotAction> actionQueue;
     private bool isCapturing;
     private string? goal;
     private bool hasReceivedBotState = false;
+    
+    private List<MovementQueueItem> movementQueue;
+    private BotViewCell? centerCell;
 
     public BotService()
     {
         botView = new();
-        actionQueue = new();
+        movementQueue = new();
     }
 
     public BotCommand ProcessState()
     {
         hasReceivedBotState = false;
 
-        BotViewCell centerCell = botView.GetCenterCell();
+        centerCell = botView.GetCenterCell();
         Console.WriteLine($"Center Cell = {centerCell.Location}");
         
-        if (actionQueue.Count > 0 && centerCell.CellType == myTerritory && isCapturing)
+        if (movementQueue.Count > 0 && centerCell.CellType == myTerritory && isCapturing)
         {
             //if I am standing in my own territory after capture. Cancel all queued actions and do something new
-            actionQueue = new();
+            movementQueue = new();
         }
 
         BotCommand? botCommand = CommandFromQueue();
         if (botCommand != null) return botCommand;
 
-        List<BotViewCell> clockwiseView = CellFinder.GetClockwiseView(botView.Cells);
+        List<BotViewCell> clockwiseView = CellFinderService.GetClockwiseView(botView.Cells);
 
         //find a corner that matches myTerritory
-        CellFinderResult? cornerCell = CellFinder.FindCornerCell(botView, clockwiseView, myTerritory, botState!.DirectionState);
+        CellFinderResult? cornerCell = CellFinderService.FindCornerCell(botView, clockwiseView, myTerritory, botState!.DirectionState);
 
         Console.WriteLine($"Corner Found = {cornerCell?.Cell.Location}");
 
@@ -46,13 +48,13 @@ class BotService
         {
             if (cornerCell.Cell.Location == centerCell.Location)
             {
-                actionQueue = BotMovement.CaptureTerritory(cornerCell, botView, myTerritory);
+                movementQueue = BotMovementService.CaptureTerritory(cornerCell, botView);
                 goal = "Capturing";
                 isCapturing = true;
             }
             else
             {
-                actionQueue = BotMovement.MoveToDestination(centerCell, cornerCell.Cell, botView);
+                movementQueue = new() { new(cornerCell.Cell.Location) };
                 goal = "Moving to Corner";
                 isCapturing = false;
             }
@@ -62,20 +64,20 @@ class BotService
         }
 
         //can't find a corner. Find a line instead
-        CellFinderResult? lineCell = CellFinder.FindLineCell(botView, clockwiseView, myTerritory, botState!.DirectionState);
+        CellFinderResult? lineCell = CellFinderService.FindLineCell(botView, clockwiseView, myTerritory, botState!.DirectionState);
         Console.WriteLine($"Line Found = {lineCell?.Cell.Location}");
 
         if (lineCell != null)
         {
             if (lineCell.Cell.Location == centerCell.Location)
             {
-                actionQueue = BotMovement.MoveAlongLine(lineCell, botView, myTerritory);
+                movementQueue = BotMovementService.MoveAlongLine(lineCell, botView, myTerritory);
                 goal = "Moving along line";
                 isCapturing = false;
             }
             else
             {
-                actionQueue = BotMovement.MoveToDestination(centerCell, lineCell.Cell, botView);
+                movementQueue = new() { new(lineCell.Cell.Location) };
                 goal = "Moving to Line";
                 isCapturing = false;
             }
@@ -95,48 +97,45 @@ class BotService
     private BotCommand? CommandFromQueue()
     {
         //queue has items. Move along the queue
-        if (actionQueue.Count > 0)
+        if (movementQueue.Count > 0)
         {
-            Console.WriteLine($"Goal - {goal}");
+            MovementQueueItem thisMovement = movementQueue.First();
 
-            //fix conflicting directions in the queue
-            //if (!botState!.DirectionState.CanMove(actionQueue.Peek()))
-            //{
-            //    Console.WriteLine("Can't move - resetting");
-            //    //pop the the item we just checked won't work
-            //    actionQueue.Dequeue();
+            Console.WriteLine($"Movement Queue Destination : {thisMovement.Destination}");
 
-            //    //pop through the queue to find the next direction that will work and reset the queue for the next tick
-            //    while(actionQueue.Count > 0)
-            //    {
-            //        BotAction action = actionQueue.Dequeue();
-            //        if (botState.DirectionState.CanMove(action))
-            //        {
-            //            actionQueue = new();
-            //            return new()
-            //            {
-            //                BotId = botId,
-            //                Action = action
-            //            };
-            //        }
-            //    }
-
-            //    //couldn't find a direction - just move clockwise 
-            //    actionQueue = new();
-            //    return new()
-            //    {
-            //        BotId = botId,
-            //        Action = botState.DirectionState.ToLocationDirection().NextClockwiseDirection().ToBotAction(),
-            //    };
-            //}
-
-            BotCommand command = new()
+            while (thisMovement.Destination == centerCell!.Location)
             {
-                BotId = botId,
-                Action = actionQueue.Dequeue(),
-            };
+                movementQueue.RemoveAt(0);
+                if (movementQueue.Count > 0)
+                {
+                    thisMovement = movementQueue.First();
+                }
+                else return null;
+            }
 
-            return command;
+            Console.WriteLine($"New Destination : {thisMovement.Destination}");
+            Console.WriteLine($"Queue = {string.Join("; ", movementQueue.Select(x => x.Destination))} : Current Location: {centerCell!.Location}");
+
+            if (thisMovement.Actions.Count <= 0 || !thisMovement.Actions.AreMovementActionsSafe())
+            {
+                thisMovement.Actions = BotMovementService.MoveToDestination(centerCell.Location, thisMovement.Destination, botView);
+            }
+
+            if (thisMovement.Actions.Count > 0)
+            {
+                //keep going through the queue
+                BotAction botAction = thisMovement.Actions.First().Action;
+                thisMovement.Actions.RemoveAt(0);
+
+                Console.WriteLine($"Goal - {goal}");
+                Console.WriteLine($"!!COMMAND - {botAction}");
+                BotCommand command = new()
+                {
+                    BotId = botId,
+                    Action = botAction,
+                };
+                return command;
+            }
         }
 
         return null;
