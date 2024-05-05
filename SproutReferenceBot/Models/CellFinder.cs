@@ -115,6 +115,18 @@ namespace SproutReferenceBot.Models
                 CellType leftType = botView.Cells[leftIndex.X][leftIndex.Y].CellType;
                 CellType upType = botView.Cells[upIndex.X][upIndex.Y].CellType;
 
+                CellType[] validateSideTypes = { rightType, downType, leftType, upType };
+                /*
+                 * Not valid when:
+                 * if 2 of the sides are out of bounds. Corner of map
+                 * OR if there are not exactly 2 sides of myTerritory
+                 */ 
+                if (validateSideTypes.Count(x => x == CellType.OutOfBounds) >= 2
+                    || validateSideTypes.Count(x => x == myTerritory) != 2)
+                {
+                    continue;
+                }
+
                 CellFinderPriority priority = new(centerCell.Location.DistanceTo(cell.Location), centerCell.Location.DirectionPriority(cell.Location, currentDirection));
 
                 CellFinderResult cellFinder = new(cell, priority);
@@ -171,10 +183,19 @@ namespace SproutReferenceBot.Models
             {
                 return allCorners.First(x => x.Cell.Location == centerCell.Location);
             }
-            else 
+            else if (allCorners.Count > 1)
             {
-                return allCorners.OrderBy(x => x.Priority.DirectionValue).ThenBy(x => x.Priority.Distance).FirstOrDefault();
+                //group corners with the same priorities
+                //then pick a random corner from that group
+                var groupedCorners = (from corner in allCorners
+                                      group corner by new { corner.Priority.DirectionValue, corner.Priority.Distance } into grp
+                                      orderby grp.Key.DirectionValue ascending, grp.Key.Distance
+                                      select grp.ToList()).First();
+
+                Random randCorner = new();
+                return groupedCorners[randCorner.Next(0, groupedCorners.Count)];
             }
+            else return null;
         }
 
         /// <summary>
