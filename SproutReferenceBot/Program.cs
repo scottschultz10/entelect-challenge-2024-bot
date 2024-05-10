@@ -62,6 +62,7 @@ connection.On<BotStateDTO>(
         botService.SetBotState(botState);
 
         Console.WriteLine("========");
+        Console.WriteLine($"Game Tick: {botState.GameTick}");
         //Console.WriteLine(botState.PrintBotState());
         //Console.WriteLine(botService.PrintBotView());
     }

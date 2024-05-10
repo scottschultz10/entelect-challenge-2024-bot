@@ -381,7 +381,7 @@ namespace SproutReferenceBot.Models
                     //keep going up
                     return -1;
                 }
-                else return 0;
+                else return -2;
             }
             else if (currentDirection == BotAction.Down)
             {
@@ -395,7 +395,7 @@ namespace SproutReferenceBot.Models
                     //keep going down
                     return -1;
                 }
-                else return 0;
+                else return -2;
             }
             else if (currentDirection == BotAction.Left)
             {
@@ -409,7 +409,7 @@ namespace SproutReferenceBot.Models
                     //keep going left
                     return -1;
                 }
-                else return 0;
+                else return -2;
             }
             else if (currentDirection == BotAction.Right)
             {
@@ -422,7 +422,7 @@ namespace SproutReferenceBot.Models
                 {
                     return -1;
                 }
-                else return 0;
+                else return -2;
             }
             else return 0;
         }

@@ -52,8 +52,6 @@ class BotService
             if (botCommand != null) return botCommand;
         }
 
-        List<BotViewCell> clockwiseView = CellFinderService.GetClockwiseView(botView);
-
         //find a corner that matches myTerritory
         CellFinderResult? cornerCell = CellFinderService.FindCornerCell(botView, clockwiseView, myTerritory, botState!.DirectionState);
         CellFinderResult? lineCell = CellFinderService.FindLineCell(botView, clockwiseView, myTerritory, botState!.DirectionState);
@@ -183,11 +181,13 @@ class BotService
     {
         this.botState = botState;
         this.botView.SetBotView(botState);
+        clockwiseView = CellFinderService.GetClockwiseView(botView);
         hasReceivedBotState = true;
 
         if (botState.DirectionState == BotAction.IDLE)
         {
             myTerritory = botView.GetCenterCell().CellType;
+            startingLocation = botView.GetCenterCell().Location;
         }
     }
 
