@@ -12,6 +12,8 @@ namespace SproutReferenceBot.Models
         public List<CellFinderDirection> Directions;
         public CellFinderPriority Priority;
         public BotViewCell Cell;
+        public bool CanCapture = false;
+        public bool HasPriority = false;
 
         public CellFinderResult(BotViewCell cell, CellFinderPriority priority)
         {

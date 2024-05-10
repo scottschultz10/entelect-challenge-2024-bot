@@ -2,6 +2,7 @@
 using SproutReferenceBot.Models;
 using System;
 using System.Collections.Generic;
+using System.Dynamic;
 using System.Linq;
 using System.Reflection.Metadata.Ecma335;
 using System.Text;
@@ -94,8 +95,8 @@ namespace SproutReferenceBot.Services
                 }
 
                 CellFinderPriority priority = new(centerCell.Location.DistanceTo(cell.Location), centerCell.Location.DirectionPriority(cell.Location, currentDirection));
-
                 CellFinderResult cellFinder = new(cell, priority);
+                cellFinder.HasPriority = priority.DirectionValue < 0;
 
                 //check that this cell has two adjacent cells that are myTerritory and the other 2 are not
                 if (rightCell.CellType == myTerritory && downCell.CellType == myTerritory && leftCell.CellType != myTerritory && upCell.CellType != myTerritory)
@@ -144,6 +145,8 @@ namespace SproutReferenceBot.Services
                 }
             }
 
+            Console.WriteLine($"All Corners {centerCell.Location} = {string.Join(", ", allCorners.Select(x => x.Cell.Location))}");
+
             //standing on corner cell / return that
             if (allCorners.Any(x => x.Cell.Location == centerCell.Location))
             {
@@ -155,7 +158,7 @@ namespace SproutReferenceBot.Services
                 //then pick a random corner from that group
                 var groupedCorners = (from corner in allCorners
                                       group corner by new { corner.Priority.DirectionValue, corner.Priority.Distance } into grp
-                                      orderby grp.Key.DirectionValue ascending, grp.Key.Distance
+                                      orderby (grp.Key.Distance / 3) ascending, grp.Key.DirectionValue ascending
                                       select grp.ToList()).First();
 
                 Random randCorner = new();
@@ -192,41 +195,105 @@ namespace SproutReferenceBot.Services
 
                 CellFinderPriority priority = new(centerCell.Location.DistanceTo(cell.Location), centerCell.Location.DirectionPriority(cell.Location, currentDirection));
                 CellFinderResult cellFinder = new(cell, priority);
-
-                if (priority.DirectionValue > 0)
-                {
-                    continue;
-                }
+                cellFinder.HasPriority = priority.DirectionValue < 0;
 
                 //check that this cell has 3 adjacent cells that are myTerritory and the other 1 is not
                 if (rightCell.CellType == myTerritory && downCell.CellType == myTerritory && leftCell.CellType == myTerritory && upCell.CellType != myTerritory)
                 {
                     //up empty line
-                    cellFinder.Directions = [new CellFinderDirection(LocationDirection.Right, RotationDirection.CounterClockwise)];
+                    if (upCell.CellType != CellType.OutOfBounds)
+                    {
+                        cellFinder.Directions = new()
+                        {
+                            new CellFinderDirection(LocationDirection.Up, RotationDirection.Clockwise),
+                            new CellFinderDirection(LocationDirection.Up, RotationDirection.CounterClockwise),
+                        };
+                        cellFinder.CanCapture = true;
+                    }
+                    else
+                    {
+                        cellFinder.Directions = [new CellFinderDirection(LocationDirection.Right, RotationDirection.CounterClockwise)];
+                    }
 
                     allLines.Add(cellFinder);
                 }
                 else if (rightCell.CellType != myTerritory && downCell.CellType == myTerritory && leftCell.CellType == myTerritory && upCell.CellType == myTerritory)
                 {
                     //right empty line
-                    cellFinder.Directions = [new CellFinderDirection(LocationDirection.Down, RotationDirection.Clockwise)];
+                    if (rightCell.CellType != CellType.OutOfBounds)
+                    {
+                        cellFinder.Directions = new() 
+                        { 
+                            new CellFinderDirection(LocationDirection.Right, RotationDirection.Clockwise),
+                            new CellFinderDirection(LocationDirection.Right, RotationDirection.CounterClockwise),
+                        };
+                        cellFinder.CanCapture = true;
+                    }
+                    else
+                    {
+                        cellFinder.Directions = [new CellFinderDirection(LocationDirection.Down, RotationDirection.Clockwise)];
+                    }
+                    
                     allLines.Add(cellFinder);
                 }
                 else if (rightCell.CellType == myTerritory && downCell.CellType != myTerritory && leftCell.CellType == myTerritory && upCell.CellType == myTerritory)
                 {
                     //down empty line
-                    cellFinder.Directions = [new CellFinderDirection(LocationDirection.Left, RotationDirection.CounterClockwise)];
+                    if (downCell.CellType != CellType.OutOfBounds)
+                    {
+                        cellFinder.Directions = new()
+                        {
+                            new CellFinderDirection(LocationDirection.Down, RotationDirection.Clockwise),
+                            new CellFinderDirection(LocationDirection.Down, RotationDirection.CounterClockwise),
+                        };
+                        cellFinder.CanCapture = true;
+                    }
+                    else
+                    {
+                        cellFinder.Directions = [new CellFinderDirection(LocationDirection.Left, RotationDirection.CounterClockwise)];
+                    }
+
                     allLines.Add(cellFinder);
                 }
                 else if (rightCell.CellType == myTerritory && downCell.CellType == myTerritory && leftCell.CellType != myTerritory && upCell.CellType == myTerritory)
                 {
                     //left empty line
-                    cellFinder.Directions = [new CellFinderDirection(LocationDirection.Up, RotationDirection.Clockwise)];
+                    if (leftCell.CellType != CellType.OutOfBounds)
+                    {
+                        cellFinder.Directions = new()
+                        {
+                            new CellFinderDirection(LocationDirection.Left, RotationDirection.Clockwise),
+                            new CellFinderDirection(LocationDirection.Left, RotationDirection.CounterClockwise),
+                        };
+                        cellFinder.CanCapture = true;
+                    }
+                    else
+                    {
+                        cellFinder.Directions = [new CellFinderDirection(LocationDirection.Up, RotationDirection.Clockwise)];
+                    }
+
                     allLines.Add(cellFinder);
                 }
             }
 
-            return allLines.OrderBy(x => x.Priority.DirectionValue).ThenBy(x => x.Priority.Distance).FirstOrDefault();
+            if (allLines.Any(x => x.Cell.Location == centerCell.Location))
+            {
+                return allLines.First(x => x.Cell.Location == centerCell.Location);
+            }
+            else if (allLines.Count > 0)
+            {
+                //group lines with the same priorities
+                //then pick a random line from that group
+                var groupedLines = (from line in allLines
+                                    group line by new { line.Priority.DirectionValue, line.Priority.Distance } into grp
+                                    orderby (grp.Key.DirectionValue  / 3) ascending, grp.Key.Distance ascending
+                                    select grp.ToList()).First();
+
+                Random randCorner = new();
+                return groupedLines[randCorner.Next(0, groupedLines.Count)];
+            }
+            else return null;
         }
+
     }
 }

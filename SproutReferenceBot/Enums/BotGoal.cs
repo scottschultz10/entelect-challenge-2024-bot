@@ -12,6 +12,6 @@ namespace SproutReferenceBot.Enums
         MoveToCorner = 1,
         MoveToLine = 2,
         MoveAlongLine = 3,
-        Capturing = 4,
+        Capture = 4,
     }
 }
