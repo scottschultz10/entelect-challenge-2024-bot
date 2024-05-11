@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace SproutReferenceBot.Services
 {
-   
+
     public static class CellFinderService
     {
         /// <summary>
@@ -21,11 +21,11 @@ namespace SproutReferenceBot.Services
         {
             if (botView.Cells.Count == 0) return new();
 
-            BotViewCell centerCell = botView.GetCenterCell();
+            BotViewCell centerCell = botView.CenterCell();
 
             List<BotViewCell> clockwiseView = new() { centerCell };
 
-            BotViewCell? currentCell = botView.GetCellByLocation(centerCell.Location.Move(LocationDirection.Right));
+            BotViewCell? currentCell = botView.CellByLocation(centerCell.Location.Move(LocationDirection.Right));
             Location currentDirection = LocationDirection.Down;
             int directionMax = 1;
             int directionCount = 0;
@@ -50,7 +50,7 @@ namespace SproutReferenceBot.Services
                 }
 
                 directionCount++;
-                currentCell = botView.GetCellByLocation(currentCell.Location.Move(currentDirection));
+                currentCell = botView.CellByLocation(currentCell.Location.Move(currentDirection));
             }
 
             return clockwiseView;
@@ -64,17 +64,29 @@ namespace SproutReferenceBot.Services
         /// <returns>Null if no corner found in the botView</returns>
         public static CellFinderResult? FindCornerCell(BotView botView, List<BotViewCell> clockwiseView, CellType myTerritory, BotAction currentDirection)
         {
-            BotViewCell centerCell = botView.GetCenterCell();
+            BotViewCell centerCell = botView.CenterCell();
 
             //find multiple corners and prioritise
             List<CellFinderResult> allCorners = new();
 
             foreach (BotViewCell cell in clockwiseView)
             {
-                BotViewCell? rightCell = botView.GetCellByLocation(cell.Location.Move(LocationDirection.Right));
-                BotViewCell? downCell = botView.GetCellByLocation(cell.Location.Move(LocationDirection.Down));
-                BotViewCell? leftCell = botView.GetCellByLocation(cell.Location.Move(LocationDirection.Left));
-                BotViewCell? upCell = botView.GetCellByLocation(cell.Location.Move(LocationDirection.Up));
+                //ignore corners with weeds
+                if (cell.HasWeed)
+                {
+                    continue;
+                }
+
+                List<BotViewCell> bufferList = botView.CellBufferByLocation(cell.Location);
+                if (bufferList.Any(x => x.HasWeed) && !bufferList.Any(x => x.CellType == CellType.OutOfBounds))
+                {
+                    continue;
+                }
+
+                BotViewCell? rightCell = botView.CellByLocation(cell.Location.Move(LocationDirection.Right));
+                BotViewCell? downCell = botView.CellByLocation(cell.Location.Move(LocationDirection.Down));
+                BotViewCell? leftCell = botView.CellByLocation(cell.Location.Move(LocationDirection.Left));
+                BotViewCell? upCell = botView.CellByLocation(cell.Location.Move(LocationDirection.Up));
 
                 if (rightCell == null || downCell == null || leftCell == null || upCell == null)
                 {
@@ -176,16 +188,28 @@ namespace SproutReferenceBot.Services
         /// <returns></returns>
         public static CellFinderResult? FindLineCell(BotView botView, List<BotViewCell> clockwiseView, CellType myTerritory, BotAction currentDirection)
         {
-            BotViewCell centerCell = botView.GetCenterCell();
+            BotViewCell centerCell = botView.CenterCell();
 
             List<CellFinderResult> allLines = new();
 
             foreach (BotViewCell cell in clockwiseView)
             {
-                BotViewCell? rightCell = botView.GetCellByLocation(cell.Location.Move(LocationDirection.Right));
-                BotViewCell? downCell = botView.GetCellByLocation(cell.Location.Move(LocationDirection.Down));
-                BotViewCell? leftCell = botView.GetCellByLocation(cell.Location.Move(LocationDirection.Left));
-                BotViewCell? upCell = botView.GetCellByLocation(cell.Location.Move(LocationDirection.Up));
+                if (cell.HasWeed)
+                {
+                    continue;
+                }
+
+                List<BotViewCell> bufferList = botView.CellBufferByLocation(cell.Location);
+                //ignore lines with weeds
+                if (bufferList.Any(x => x.HasWeed) && !bufferList.Any(x => x.CellType == CellType.OutOfBounds))
+                {
+                    continue;
+                }
+
+                BotViewCell? rightCell = botView.CellByLocation(cell.Location.Move(LocationDirection.Right));
+                BotViewCell? downCell = botView.CellByLocation(cell.Location.Move(LocationDirection.Down));
+                BotViewCell? leftCell = botView.CellByLocation(cell.Location.Move(LocationDirection.Left));
+                BotViewCell? upCell = botView.CellByLocation(cell.Location.Move(LocationDirection.Up));
 
                 if (rightCell == null || downCell == null || leftCell == null || upCell == null)
                 {
@@ -222,8 +246,8 @@ namespace SproutReferenceBot.Services
                     //right empty line
                     if (rightCell.CellType != CellType.OutOfBounds)
                     {
-                        cellFinder.Directions = new() 
-                        { 
+                        cellFinder.Directions = new()
+                        {
                             new CellFinderDirection(LocationDirection.Right, RotationDirection.Clockwise),
                             new CellFinderDirection(LocationDirection.Right, RotationDirection.CounterClockwise),
                         };
@@ -233,7 +257,7 @@ namespace SproutReferenceBot.Services
                     {
                         cellFinder.Directions = [new CellFinderDirection(LocationDirection.Down, RotationDirection.Clockwise)];
                     }
-                    
+
                     allLines.Add(cellFinder);
                 }
                 else if (rightCell.CellType == myTerritory && downCell.CellType != myTerritory && leftCell.CellType == myTerritory && upCell.CellType == myTerritory)
@@ -286,7 +310,7 @@ namespace SproutReferenceBot.Services
                 //then pick a random line from that group
                 var groupedLines = (from line in allLines
                                     group line by new { line.Priority.DirectionValue, line.Priority.Distance } into grp
-                                    orderby (grp.Key.DirectionValue  / 3) ascending, grp.Key.Distance ascending
+                                    orderby (grp.Key.DirectionValue / 3) ascending, grp.Key.Distance ascending
                                     select grp.ToList()).First();
 
                 Random randCorner = new();

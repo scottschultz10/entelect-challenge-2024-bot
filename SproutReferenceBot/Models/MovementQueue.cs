@@ -10,14 +10,12 @@ namespace SproutReferenceBot.Models
     public class MovementQueueItem
     {
         public Location Destination { get; set; }
-        public List<MovementAction> Actions { get; set; }
         public CellFinderDirection Direction { get; set; }
 
         public MovementQueueItem(Location destination, CellFinderDirection direction)
         {
             Destination = destination;
             Direction = direction;
-            Actions = new();
         }
     }
 
@@ -28,7 +26,7 @@ namespace SproutReferenceBot.Models
 
         public BotViewCell? GetBotViewCell(BotView botView)
         {
-            return botView.GetCellByLocation(Location);
+            return botView.CellByLocation(Location);
         }
 
         public override string ToString()

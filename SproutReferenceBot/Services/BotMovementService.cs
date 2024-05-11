@@ -11,16 +11,69 @@ namespace SproutReferenceBot.Services
     public static class BotMovementService
     {
 
-        public static List<MovementAction> MoveToDestination(Location current, Location destination, BotView botView, BotAction currentDirection, RotationDirection? captureRotation, CellType myTerritory, BotGoal goal, Location movementOffset)
+        public static List<MovementAction> MoveToDestination(Location current, Location destination, BotView botView, BotAction currentDirection, RotationDirection? captureRotation, CellType myTerritory, BotGoal goal)
         {
             //make the basic movement first
-            Location difference = current.Difference(destination.Move(movementOffset));
+            Location difference = current.Difference(destination);
             Location currentLocation = current;
             BotAction lastDirection = currentDirection;
 
+            List<MovementAction> movementList = PopulateMovementActions(currentLocation, difference, botView, lastDirection, captureRotation, myTerritory, goal);
+
+            if (currentDirection == BotAction.IDLE)
+            {
+                return movementList;
+            }
+
+            Location offsetDirection = current.CommonDirection(destination);
+            //then check hazards on trail / and avoid
+            while (movementList.Count > 0 && !AreMovementActionsSafe(movementList, botView))
+            {
+                MovementAction actionToOffset = movementList.Last();
+
+                //go the opposite direction of the rotation
+                //offset by the most common direction
+                Location offset;
+
+                if (captureRotation == RotationDirection.Clockwise)
+                {
+                    offset = actionToOffset.Location.Move(offsetDirection, 2);
+                }
+                else
+                {
+                    offset = actionToOffset.Location.Move(offsetDirection, 2);
+                }
+
+                Console.WriteLine($"Offsetting the movement: {offset}");
+
+                //populate from current to offset
+                List<MovementAction> tempActions = PopulateMovementActions(currentLocation, currentLocation.Difference(offset), botView, lastDirection, captureRotation, myTerritory, goal);
+
+                //can't offset anymore. Change the direction more to allow more offsets
+                if (tempActions.Last().Location == movementList.Last().Location)
+                {
+                    if (captureRotation == RotationDirection.Clockwise)
+                    {
+                        offsetDirection = offsetDirection.NextCounterClockwiseDirection();
+                    }
+                    else
+                    {
+                        offsetDirection = offsetDirection.NextClockwiseDirection();
+                    }
+                }
+
+                movementList = tempActions;
+            }
+
+            return movementList;
+        }
+
+        private static List<MovementAction> PopulateMovementActions(Location currentLocation, Location difference, BotView botView, BotAction lastDirection, RotationDirection? captureRotation, CellType myTerritory, BotGoal goal)
+        {
             List<MovementAction> movementList = new();
 
-            while (difference != LocationDirection.NONE)
+            //limit the movement to 4 squares - set movement within botView
+            while (difference != LocationDirection.NONE && movementList.Count < 4)
             {
                 bool hasMoved = false;
                 List<MovementAction> possibleMovements = new();
@@ -76,30 +129,7 @@ namespace SproutReferenceBot.Services
                 }
             }
 
-            //then check hazards on trail / and avoid
-            if (movementList.Count > 0 && !AreMovementActionsSafe(movementList, botView))
-            {
-                //go the opposite direction of the rotation
-                //offset by the most common direction
-                Location offset;
-
-                if (captureRotation == RotationDirection.Clockwise)
-                {
-                    offset = movementOffset.Move(current.CommonDirection(destination.Move(movementOffset)).NextCounterClockwiseDirection());
-                }
-                else
-                {
-                    offset = movementOffset.Move(current.CommonDirection(destination.Move(movementOffset)).NextClockwiseDirection());
-                }
-
-                Console.WriteLine($"Offsetting the movement: {offset}");
-
-                return MoveToDestination(current, destination, botView, currentDirection, captureRotation, myTerritory, goal, offset);
-            }
-            else
-            {
-                return movementList;
-            }
+            return movementList;
         }
 
         private static MovementAction? PrioritiseMovementAction(Location currentLocation, List<MovementAction> possibleActions, BotView botView, CellType myTerritory, BotGoal goal, BotAction lastDirection)
@@ -110,7 +140,7 @@ namespace SproutReferenceBot.Services
                     {
                         move,
                         Direction = currentLocation.DirectionPriority(move.Location, lastDirection),
-                        CellType = _PrioritisedCellTypes(botView.GetCellByLocation(move.Location), myTerritory, goal),
+                        CellType = _PrioritisedCellTypes(botView.CellByLocation(move.Location), myTerritory, goal),
                     }).OrderBy(x => x.Direction).ThenBy(x => x.CellType).FirstOrDefault()?.move;
 
             static bool PossibleBotAction(BotAction action, BotAction lastDirection)
@@ -135,9 +165,87 @@ namespace SproutReferenceBot.Services
             }
         }
 
+        /// <summary>
+        /// Ensure that the current route I am on is safe, if not, reset my destination. Similar to MoveToDestination, but to be executed after the MovementAction list is populated and we are moving through it
+        /// </summary>
+        /// <returns>A revised set of movements</returns>
+        public static (List<MovementAction> Actions, bool AllValid) ValidateMovementActions(List<MovementAction> actions, BotView botView, CellType myTerritory, BotGoal goal)
+        {
+            BotViewCell centerCell = botView.CenterCell();
+            List<BotViewCell> actionCells = new();
+
+            foreach (MovementAction action in actions)
+            {
+                BotViewCell? cell = botView.CellByLocation(action.Location);
+
+                if (cell != null)
+                {
+                    actionCells.Add(cell);
+                }
+            }
+
+            List<BotViewCell> validCells = actionCells;
+
+            //shorten the movement lists / and keep searching
+            if (validCells.Any(x => x.CellType == CellType.OutOfBounds))
+            {
+                List<BotViewCell> tempCells = new();
+                foreach (BotViewCell cell in validCells)
+                {
+                    //take out all outofbounds
+                    if (cell.CellType != CellType.OutOfBounds)
+                    {
+                        tempCells.Add(cell);
+                    }
+                    else break;
+                }
+
+                validCells = tempCells;
+            }
+
+            if (goal == BotGoal.Capture && validCells.Any(x => x.CellType == myTerritory))
+            {
+                List<BotViewCell> tempCells = new();
+                foreach (BotViewCell cell in validCells)
+                {
+                    tempCells.Add(cell);
+                    //keep the last myTerritory as the destination
+                    if (cell.CellType == myTerritory)
+                    {
+                        break;
+                    }
+                }
+
+                validCells = tempCells;
+            }
+
+            if (validCells.Count == 0)
+            {
+                return (new(), false);
+            }
+
+            //movement is still the same
+            if (validCells.Count == actionCells.Count)
+            {
+                return (actions, true);
+            }
+            else
+            {
+                List<MovementAction> returnActions = new();
+                foreach (BotViewCell cell in validCells)
+                {
+                    returnActions.Add(actions.First(x => x.Location == cell.Location));
+                }
+
+                return (returnActions, false);
+            }
+        }
+
 
         public static List<MovementQueueItem> CaptureTerritory(CellFinderResult cellFinder, BotView botView, CellType myTerritory)
         {
+            //TODO - use last direction to pick the capture. ORDERBY
+
             List<List<MovementQueueItem>> allQueues = new();
 
             foreach (CellFinderDirection direction in cellFinder.Directions)
@@ -149,8 +257,6 @@ namespace SproutReferenceBot.Services
             int maxDistance = 0;
             for (int i = 0; i < allQueues.Count; i++)
             {
-                Console.WriteLine($"action queue count: {allQueues[i].Count}");
-
                 int totalDistance = 0;
                 if (allQueues.Count > 1)
                 {
@@ -185,16 +291,16 @@ namespace SproutReferenceBot.Services
             for (int directionChangeCount = 0; directionChangeCount < 4; directionChangeCount++)
             {
                 //increase the max to avoid colliding with ourselves
-                if (directionChangeCount == 2)
+                if (directionChangeCount == 1)
                 {
-                    directionMax++;
+                    directionMax *= 2;
                 }
 
                 List<(Location Location, BotViewCell? Cell)?> cells = new();
                 for (int i = 1; i <= directionMax; i++)
                 {
                     Location cellLocation = currentLocation.Move(currentDirection, i);
-                    cells.Add((cellLocation, botView.GetCellByLocation(cellLocation)));
+                    cells.Add((cellLocation, botView.CellByLocation(cellLocation)));
                 }
 
                 //find a valid destination
@@ -214,13 +320,13 @@ namespace SproutReferenceBot.Services
                     tempLocation = cells.LastOrDefault()?.Location ?? currentLocation;
                 }
 
-                if (botView.GetCellByLocation(tempLocation)?.CellType != CellType.OutOfBounds && tempLocation != currentDirection)
+                if (botView.CellByLocation(tempLocation)?.CellType != CellType.OutOfBounds && tempLocation != currentDirection)
                 {
                     destinationList.Add(new(tempLocation, new(currentDirection, direction.Rotation)));
                     currentLocation = tempLocation;
 
                     //we have hit myTerritory, stop capturing
-                    if (botView.GetCellByLocation(currentLocation)?.CellType == myTerritory)
+                    if (botView.CellByLocation(currentLocation)?.CellType == myTerritory)
                     {
                         break;
                     }
@@ -251,7 +357,7 @@ namespace SproutReferenceBot.Services
             Location tempLocation = currentLocation.Move(cellFinder.Directions.First().Direction, directionMagnitude);
 
             //stay in bounds
-            while (botView.GetCellByLocation(tempLocation)?.CellType != myTerritory && directionMagnitude > 1)
+            while (botView.CellByLocation(tempLocation)?.CellType != myTerritory && directionMagnitude > 1)
             {
                 directionMagnitude--;
                 tempLocation = currentLocation.Move(cellFinder.Directions.First().Direction, directionMagnitude);
@@ -275,7 +381,23 @@ namespace SproutReferenceBot.Services
 
         public static bool AreMovementActionsSafe(this List<MovementAction> actions, BotView botView)
         {
-            return !actions.Any(x => x.GetBotViewCell(botView)?.HasWeed == true);
+            List<BotViewCell> actionCells = actions.Where(x => x.GetBotViewCell(botView) != null).Select(x => x.GetBotViewCell(botView)!).ToList();
+
+            if (actionCells.Any(x => x.HasWeed))
+            {
+                return false;
+            }
+
+            ////check the all buffers
+            //if (actionCells.Count > 0)
+            //{
+            //    if (botView.CellBufferByLocation(actionCells.Last().Location).Any(x => x.HasWeed))
+            //    {
+            //        return false;
+            //    }
+            //}
+
+            return true;
         }
 
     }

@@ -14,6 +14,7 @@ class BotService
     private bool hasReceivedBotState = false;
     
     private List<MovementQueueItem> movementQueue;
+    private List<MovementAction> movementActions;
     private BotViewCell? centerCell;
 
     private Location? startingLocation;
@@ -23,6 +24,7 @@ class BotService
         botView = new();
         clockwiseView = new();
         movementQueue = new();
+        movementActions = new();
     }
 
     public BotCommand ProcessState()
@@ -36,7 +38,12 @@ class BotService
             goal = BotGoal.NONE;
         }
 
-        centerCell = botView.GetCenterCell();
+        if (botState!.DirectionState != BotAction.IDLE)
+        {
+            //Console.WriteLine($"Cone View : {string.Join(", ", botView.CenterCellConeView(botState!.DirectionState.ToLocationDirection()).Select(x => x.Location))}");
+        }
+
+        centerCell = botView.CenterCell();
         Console.WriteLine($"Center Cell = {centerCell.Location}");
 
         if (movementQueue.Count > 0 && centerCell.CellType == myTerritory && goal == BotGoal.Capture)
@@ -130,6 +137,9 @@ class BotService
 
             while (thisMovement.Destination == centerCell!.Location)
             {
+                //we are at the destination - reset movements
+                movementActions = new();
+
                 movementQueue.RemoveAt(0);
                 if (movementQueue.Count > 0)
                 {
@@ -138,20 +148,39 @@ class BotService
                 else return null;
             }
 
-            if (thisMovement.Actions.Count <= 0 || !thisMovement.Actions.AreMovementActionsSafe(botView))
+            if (movementActions.Count <= 0 || !movementActions.AreMovementActionsSafe(botView))
             {
-                thisMovement.Actions = BotMovementService.MoveToDestination(centerCell.Location, thisMovement.Destination, botView, botState!.DirectionState, thisMovement.Direction.Rotation, myTerritory, goal, LocationDirection.NONE);
-                thisMovement.Destination = thisMovement.Actions.Last().Location;
+                movementActions = BotMovementService.MoveToDestination(centerCell.Location, thisMovement.Destination, botView, botState!.DirectionState, thisMovement.Direction.Rotation, myTerritory, goal);
             }
-            
-            Console.WriteLine($"Movement Destination : {thisMovement.Destination}");
-            Console.WriteLine($"Queue = {string.Join("; ", movementQueue.Select(x => x.Destination))} : Current Location: {centerCell!.Location}");
 
-            if (thisMovement.Actions.Count > 0)
+            if (movementActions.Count > 0)
+            {
+                var tempActions = BotMovementService.ValidateMovementActions(movementActions, botView, myTerritory, goal);
+
+                if (tempActions.Actions.Count <= 0)
+                {
+                    //no more actions for this destination. Move to the next
+                    thisMovement.Destination = centerCell!.Location;
+                    movementActions = new();
+                    Console.WriteLine($"No Valid Movements: new destination {thisMovement.Destination}");
+                    return CommandFromQueue();
+                }
+                else if (!tempActions.AllValid)
+                {
+                    Console.WriteLine($"Changing the destination: {thisMovement.Destination} -> {movementActions.Last().Location}");
+                    //change the destination
+                    thisMovement.Destination = movementActions.Last().Location;
+                }
+            }
+
+            Console.WriteLine($"Movement Destination : {thisMovement.Destination}");
+            Console.WriteLine($"Queue = {string.Join("; ", movementQueue.Select(x => x.Destination))}");
+
+            if (movementActions.Count > 0)
             {
                 //keep going through the queue
-                BotAction botAction = thisMovement.Actions.First().Action;
-                thisMovement.Actions.RemoveAt(0);
+                BotAction botAction = movementActions.First().Action;
+                movementActions.RemoveAt(0);
 
                 Console.WriteLine($"Goal - {goal}");
                 Console.WriteLine($"!!COMMAND - {botAction}");
@@ -186,8 +215,8 @@ class BotService
 
         if (botState.DirectionState == BotAction.IDLE)
         {
-            myTerritory = botView.GetCenterCell().CellType;
-            startingLocation = botView.GetCenterCell().Location;
+            myTerritory = botView.CenterCell().CellType;
+            startingLocation = botView.CenterCell().Location;
         }
     }
 

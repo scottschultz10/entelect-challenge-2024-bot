@@ -47,7 +47,7 @@ namespace SproutReferenceBot.Models
 
                     cells[x].Add(new()
                     {
-                        Location = new (cellX, cellY),
+                        Location = new(cellX, cellY),
                         IsMe = isMe,
                         HasBot = hasBot && !isMe,
                         HasWeed = hasWeed,
@@ -58,9 +58,76 @@ namespace SproutReferenceBot.Models
             }
         }
 
-        public BotViewCell GetCenterCell()
+        public BotViewCell CenterCell()
         {
             return cells[(cells.Count - 1) / 2][(cells[0].Count - 1) / 2];
+        }
+
+        public List<BotViewCell> CenterCellConeView(Location direction)
+        {
+            BotViewCell centerCell = CenterCell();
+
+            Location fromQuadrant = direction.NextCounterClockwiseQuadrant();
+            Location toQuadrant = direction.NextClockwiseQuadrant();
+            Location populationDirection = direction.NextClockwiseDirection();
+
+            Location fromLocation = centerCell.Location.Move(fromQuadrant);
+            Location toLocation = centerCell.Location.Move(toQuadrant);
+
+            List<BotViewCell> returnView = new();
+            while (CellByLocation(fromLocation) != null || CellByLocation(toLocation) != null)
+            {
+                Location currentLocation = fromLocation;
+                BotViewCell? fromCell = CellByLocation(fromLocation);
+                if (fromCell != null)
+                {
+                    returnView.Add(fromCell);
+                }
+
+                while (currentLocation != toLocation)
+                {
+                    currentLocation = currentLocation.Move(populationDirection);
+                    BotViewCell? currentCell = CellByLocation(currentLocation);
+
+                    if (currentCell != null)
+                    {
+                        returnView.Add(currentCell);
+                    }
+                }
+
+                fromLocation = fromLocation.Move(fromQuadrant);
+                toLocation = toLocation.Move(toQuadrant);
+            }
+
+            return returnView.OrderBy(x => centerCell.Location.DistanceTo(x.Location)).ThenBy(x => (centerCell.Location.CommonDirection(x.Location) == direction) ? -1 : 1).ToList();
+        }
+
+        public List<BotViewCell> CellBufferByLocation(Location location)
+        {
+            List<Location> allBuffers = new()
+            {
+                LocationQuadrant.East,
+                LocationQuadrant.South,
+                LocationQuadrant.West,
+                LocationQuadrant.North,
+                LocationQuadrant.NorthEast,
+                LocationQuadrant.NorthWest,
+                LocationQuadrant.SouthEast,
+                LocationQuadrant.SouthWest,
+                LocationQuadrant.NONE,
+            };
+
+            List<BotViewCell> returnList = new();
+            foreach (Location buffer in allBuffers)
+            {
+                BotViewCell? bufferCell = CellByLocation(location.Move(buffer));
+                if (bufferCell != null)
+                {
+                    returnList.Add(bufferCell);
+                }
+            }
+
+            return returnList;
         }
 
 
@@ -69,7 +136,7 @@ namespace SproutReferenceBot.Models
         /// </summary>
         /// <param name="location"></param>
         /// <returns>The BotViewCell associated with the sent in location. If no location is found return null</returns>
-        public BotViewCell? GetCellByLocation(Location location)
+        public BotViewCell? CellByLocation(Location location)
         {
             //get the top-left cell and bottom-right cell as a reference / validation
             BotViewCell topLeft = cells[0][0];
