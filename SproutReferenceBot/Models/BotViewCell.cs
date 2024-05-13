@@ -1,4 +1,5 @@
 ﻿using SproutReferenceBot.Enums;
+using SproutReferenceBot.Services;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,6 +16,10 @@ namespace SproutReferenceBot.Models
         public bool HasWeed { get; set; }
         public CellType CellType { get; set; }
         public PowerUpType PowerUpType { get; set; }
+
+        public bool IsHazard => HasWeed || (HasBot && !IsMe);
+
+        public bool IsTrail => 4 <= (int)CellType && (int)CellType <= 7;
 
         public BotViewCell()
         {

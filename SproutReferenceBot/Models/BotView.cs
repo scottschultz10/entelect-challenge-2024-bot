@@ -130,6 +130,32 @@ namespace SproutReferenceBot.Models
             return returnList;
         }
 
+        /// <summary>
+        /// Buffer that only contains the Right, Down, Left, Up values 
+        /// </summary>
+        /// <returns></returns>
+        public List<BotViewCell> CellPrimaryBufferByLocation(Location location)
+        {
+            List<Location> allBuffers = new()
+            {
+                LocationQuadrant.East,
+                LocationQuadrant.South,
+                LocationQuadrant.West,
+                LocationQuadrant.North,
+            };
+
+            List<BotViewCell> returnList = new();
+            foreach (Location buffer in allBuffers)
+            {
+                BotViewCell? bufferCell = CellByLocation(location.Move(buffer));
+                if (bufferCell != null)
+                {
+                    returnList.Add(bufferCell);
+                }
+            }
+
+            return returnList;
+        }
 
         /// <summary>
         /// Send in a location value and find the associated cell in the BotView
