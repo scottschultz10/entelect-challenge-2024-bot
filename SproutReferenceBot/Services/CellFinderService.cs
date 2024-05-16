@@ -157,7 +157,7 @@ namespace SproutReferenceBot.Services
                 }
             }
 
-            Console.WriteLine($"All Corners {centerCell.Location} = {string.Join(", ", allCorners.Select(x => x.Cell.Location))}");
+            //Console.WriteLine($"All Corners {centerCell.Location} = {string.Join(", ", allCorners.Select(x => x.Cell.Location))}");
 
             //standing on corner cell / return that
             if (allCorners.Any(x => x.Cell.Location == centerCell.Location))
