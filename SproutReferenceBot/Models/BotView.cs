@@ -164,6 +164,11 @@ namespace SproutReferenceBot.Models
         /// <returns>The BotViewCell associated with the sent in location. If no location is found return null</returns>
         public BotViewCell? CellByLocation(Location location)
         {
+            if (cells.Count <=  0 || cells[^1].Count <= 0)
+            {
+                return null;
+            }
+
             //get the top-left cell and bottom-right cell as a reference / validation
             BotViewCell topLeft = cells[0][0];
             BotViewCell bottomRight = cells[cells.Count - 1][cells[0].Count - 1];
@@ -179,6 +184,12 @@ namespace SproutReferenceBot.Models
             //find how far away location is from 0,0
             //the difference is the index in the cells list
             Location index = location.Difference(topLeft.Location);
+            
+            if (index.X > cells.Count || index.Y > cells[^1].Count)
+            {
+                return null;
+            }
+
             return cells[index.X][index.Y];
         }
 

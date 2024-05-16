@@ -68,6 +68,9 @@ namespace SproutReferenceBot.Services
 
             Location offsetDirection = current.CommonDirection(destination);
             bool hasBeenOffset = false;
+            //keep track of the offsets for when we start repeating ourselves
+            List<Location> allOffsets = new();
+
             //then check hazards on trail / and avoid
             while (movementList.Count > 0 && !AreMovementActionsSafe(movementList, botView))
             {
@@ -87,6 +90,15 @@ namespace SproutReferenceBot.Services
                 }
 
                 Console.WriteLine($"Offsetting the movement: {offset}");
+
+                if (allOffsets.Contains(offset))
+                {
+                    //no valid offsets will save us. Accept death
+                    Console.WriteLine("Accepting Death");
+                    return (movementList, hasBeenOffset, movementList.Last().Location.Difference(currentLocation));
+                }
+
+                allOffsets.Add(offset);
 
                 //populate from current to offset
                 List<MovementAction> tempActions = PopulateMovementActions(currentLocation, currentLocation.Difference(offset), botView, lastDirection, captureRotation);
