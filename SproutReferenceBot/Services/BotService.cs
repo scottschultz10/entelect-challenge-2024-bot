@@ -74,7 +74,7 @@ public class BotService
             if (botCommand != null) return botCommand;
         }
 
-        if (lineCell != null && lineCell.Cell.Location == centerCell.Location)
+        if (lineCell != null && lineCell.Cell.Location == centerCell.Location && lineCell.CanCapture)
         {
             movementQueue = BotMovementService.CaptureTerritory(lineCell, botView);
             BotServiceHelpers.Goal = BotGoal.Capture;

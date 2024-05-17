@@ -110,50 +110,92 @@ namespace SproutReferenceBot.Services
                 CellFinderResult cellFinder = new(cell, priority);
                 cellFinder.HasPriority = priority.DirectionValue < 0;
 
+                bool canCaptureUp = cellFinder.CanCapture = CanCaptureDirection(cell.Location, LocationDirection.Up, botView);
+                bool canCaptureRight = cellFinder.CanCapture = CanCaptureDirection(cell.Location, LocationDirection.Right, botView);
+                bool canCaptureDown = cellFinder.CanCapture = CanCaptureDirection(cell.Location, LocationDirection.Down, botView);
+                bool canCaptureLeft = CanCaptureDirection(cell.Location, LocationDirection.Left, botView);
+
                 //check that this cell has two adjacent cells that are BotServiceHelpers.MyTerritory and the other 2 are not
                 if (rightCell.CellType == BotServiceHelpers.MyTerritory && downCell.CellType == BotServiceHelpers.MyTerritory && leftCell.CellType != BotServiceHelpers.MyTerritory && upCell.CellType != BotServiceHelpers.MyTerritory)
                 {
-                    cellFinder.Directions = new()
+                    //check each direction for safe movement
+                    List<CellFinderDirection> tempDirections = new();
+                    if (canCaptureUp)
                     {
-                        new CellFinderDirection(LocationDirection.Up, RotationDirection.Clockwise),
-                        new CellFinderDirection(LocationDirection.Left, RotationDirection.CounterClockwise)
-                    };
+                        tempDirections.Add(new(LocationDirection.Up, RotationDirection.Clockwise));
+                    }
+                    if (canCaptureLeft)
+                    {
+                        tempDirections.Add(new(LocationDirection.Left, RotationDirection.CounterClockwise));
+                    }
 
-                    //right-down corner
-                    allCorners.Add(cellFinder);
+                    if (tempDirections.Count > 0)
+                    {
+                        cellFinder.Directions = tempDirections;
+
+                        //right-down corner
+                        allCorners.Add(cellFinder);
+                    }
                 }
                 else if (rightCell.CellType != BotServiceHelpers.MyTerritory && downCell.CellType == BotServiceHelpers.MyTerritory && leftCell.CellType == BotServiceHelpers.MyTerritory && upCell.CellType != BotServiceHelpers.MyTerritory)
                 {
-                    //down-left corner
-                    cellFinder.Directions = new()
+                    List<CellFinderDirection> tempDirections = new();
+                    if (canCaptureRight)
                     {
-                        new CellFinderDirection(LocationDirection.Right, RotationDirection.Clockwise),
-                        new CellFinderDirection(LocationDirection.Up, RotationDirection.CounterClockwise),
-                    };
+                        tempDirections.Add(new(LocationDirection.Right, RotationDirection.Clockwise));
+                    }
+                    if (canCaptureUp)
+                    {
+                        tempDirections.Add(new(LocationDirection.Up, RotationDirection.CounterClockwise));
+                    }
 
-                    allCorners.Add(cellFinder);
+                    if (tempDirections.Count > 0)
+                    {
+                        cellFinder.Directions = tempDirections;
+
+                        //down-left corner
+                        allCorners.Add(cellFinder);
+                    }
                 }
                 else if (rightCell.CellType != BotServiceHelpers.MyTerritory && downCell.CellType != BotServiceHelpers.MyTerritory && leftCell.CellType == BotServiceHelpers.MyTerritory && upCell.CellType == BotServiceHelpers.MyTerritory)
                 {
-                    //left-up corner
-                    cellFinder.Directions = new()
+                    List<CellFinderDirection> tempDirections = new();
+                    if (canCaptureDown)
                     {
-                        new CellFinderDirection(LocationDirection.Down, RotationDirection.Clockwise),
-                        new CellFinderDirection(LocationDirection.Right, RotationDirection.CounterClockwise),
-                    };
+                        tempDirections.Add(new(LocationDirection.Down, RotationDirection.Clockwise));
+                    }
+                    if (canCaptureRight)
+                    {
+                        tempDirections.Add(new(LocationDirection.Right, RotationDirection.CounterClockwise));
+                    }
 
-                    allCorners.Add(cellFinder);
+                    if (tempDirections.Count > 0)
+                    {
+                        cellFinder.Directions = tempDirections;
+
+                        //left-up corner
+                        allCorners.Add(cellFinder);
+                    }
                 }
                 else if (rightCell.CellType == BotServiceHelpers.MyTerritory && downCell.CellType != BotServiceHelpers.MyTerritory && leftCell.CellType != BotServiceHelpers.MyTerritory && upCell.CellType == BotServiceHelpers.MyTerritory)
                 {
-                    //up-right corner
-                    cellFinder.Directions = new()
+                    List<CellFinderDirection> tempDirections = new();
+                    if (canCaptureLeft)
                     {
-                        new CellFinderDirection(LocationDirection.Left, RotationDirection.Clockwise),
-                        new CellFinderDirection(LocationDirection.Down, RotationDirection.CounterClockwise),
-                    };
+                        tempDirections.Add(new(LocationDirection.Left, RotationDirection.Clockwise));
+                    }
+                    if (canCaptureDown)
+                    {
+                        tempDirections.Add(new(LocationDirection.Down, RotationDirection.CounterClockwise));
+                    }
+        
+                    if (tempDirections.Count > 0)
+                    {
+                        cellFinder.Directions = tempDirections;
 
-                    allCorners.Add(cellFinder);
+                        //up-right corner
+                        allCorners.Add(cellFinder);
+                    }
                 }
             }
 
@@ -177,6 +219,11 @@ namespace SproutReferenceBot.Services
                 return groupedCorners[randCorner.Next(0, groupedCorners.Count)];
             }
             else return null;
+        }
+
+        private static bool CanCaptureDirection(Location currentLocation, Location direction, BotView botView)
+        {
+            return BotMovementService.AreMovementActionsSafe(BotMovementService.MoveToDestinationBasic(currentLocation, currentLocation.Move(direction, 4)), botView);
         }
 
         /// <summary>
@@ -234,7 +281,7 @@ namespace SproutReferenceBot.Services
                         };
 
                         //check that the initial capture path is safe 
-                        cellFinder.CanCapture = BotMovementService.AreMovementActionsSafe(BotMovementService.MoveToDestinationBasic(cell.Location, cell.Location.Move(LocationDirection.Up, 4)), botView);
+                        cellFinder.CanCapture = CanCaptureDirection(cell.Location, LocationDirection.Up, botView);
                     }
                     else
                     {
@@ -254,7 +301,8 @@ namespace SproutReferenceBot.Services
                             new CellFinderDirection(LocationDirection.Right, RotationDirection.CounterClockwise),
                         };
                         //check that the initial capture path is safe 
-                        cellFinder.CanCapture = BotMovementService.AreMovementActionsSafe(BotMovementService.MoveToDestinationBasic(cell.Location, cell.Location.Move(LocationDirection.Right, 4)), botView);
+                        cellFinder.CanCapture = CanCaptureDirection(cell.Location, LocationDirection.Right, botView);
+
                     }
                     else
                     {
@@ -274,7 +322,8 @@ namespace SproutReferenceBot.Services
                             new CellFinderDirection(LocationDirection.Down, RotationDirection.CounterClockwise),
                         };
                         //check that the initial capture path is safe 
-                        cellFinder.CanCapture = BotMovementService.AreMovementActionsSafe(BotMovementService.MoveToDestinationBasic(cell.Location, cell.Location.Move(LocationDirection.Down, 4)), botView);
+                        cellFinder.CanCapture = CanCaptureDirection(cell.Location, LocationDirection.Down, botView);
+
                     }
                     else
                     {
@@ -294,7 +343,8 @@ namespace SproutReferenceBot.Services
                             new CellFinderDirection(LocationDirection.Left, RotationDirection.CounterClockwise),
                         };
                         //check that the initial capture path is safe 
-                        cellFinder.CanCapture = BotMovementService.AreMovementActionsSafe(BotMovementService.MoveToDestinationBasic(cell.Location, cell.Location.Move(LocationDirection.Left, 4)), botView);
+                        cellFinder.CanCapture = CanCaptureDirection(cell.Location, LocationDirection.Left, botView);
+
                     }
                     else
                     {
