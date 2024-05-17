@@ -82,11 +82,11 @@ namespace SproutReferenceBot.Services
 
                 if (captureRotation == RotationDirection.Clockwise)
                 {
-                    offset = actionToOffset.Location.Move(offsetDirection, 2);
+                    offset = actionToOffset.Location.Move(offsetDirection, 1);
                 }
                 else
                 {
-                    offset = actionToOffset.Location.Move(offsetDirection, 2);
+                    offset = actionToOffset.Location.Move(offsetDirection, 1);
                 }
 
                 Console.WriteLine($"Offsetting the movement: {offset}");
@@ -365,7 +365,7 @@ namespace SproutReferenceBot.Services
                 //increase the max to avoid colliding with ourselves
                 if (directionChangeCount == 1)
                 {
-                    directionMax *= 2;
+                    directionMax += 2;
                 }
 
                 List<(Location Location, BotViewCell? Cell)?> cells = new();
