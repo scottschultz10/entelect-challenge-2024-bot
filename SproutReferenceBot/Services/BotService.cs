@@ -52,7 +52,7 @@ public class BotService
         }
 
         BotCommand? botCommand;
-        if (BotServiceHelpers.Goal != BotGoal.MoveAlongLine && BotServiceHelpers.Goal != BotGoal.MoveToLine)
+        if (BotServiceHelpers.Goal != BotGoal.MoveAlongLine && BotServiceHelpers.Goal != BotGoal.MoveToLine && BotServiceHelpers.Goal != BotGoal.MoveToCorner)
         {
             botCommand = CommandFromQueue();
             if (botCommand != null) return botCommand;
