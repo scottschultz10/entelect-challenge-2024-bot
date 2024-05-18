@@ -63,8 +63,6 @@ connection.On<BotStateDTO>(
 
         Console.WriteLine("========");
         Console.WriteLine($"Game Tick: {botState.GameTick}");
-        //Console.WriteLine(botState.PrintBotState());
-        //Console.WriteLine(botService.PrintBotView());
     }
 );
 
@@ -97,7 +95,6 @@ while (connection.State == HubConnectionState.Connected || connection.State == H
         BotCommand command = botService.ProcessState();
 
         //Console.WriteLine(botService.PrintBotView());
-
         await connection.InvokeAsync("SendPlayerCommand", command);
     }
 }
