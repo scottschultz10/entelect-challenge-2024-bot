@@ -150,6 +150,12 @@ public class BotService
         //queue has items. Move along the queue / or i have a sideTrack
         if (movementQueue.Count > 0 || sideTrackMovementItem != null)
         {
+            /*TODO: For sidetrack. Expand on when the bot checks for side track 
+             * Check cone view on old direction + new direction 
+             * Increase cone view, add more surrounding cells close to bot
+             * maybe: check for sidetrack whenever sidetrack is null
+            */
+
             //check for side track first
             MovementQueueItem? thisMovement = null;
             if (sideTrackMovementItem != null)
