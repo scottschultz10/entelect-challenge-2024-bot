@@ -9,8 +9,9 @@ public class BotService
     private readonly BotView botView;
     private List<BotViewCell> clockwiseView;
     private bool hasReceivedBotState = false;
-    
+
     private List<MovementQueueItem> movementQueue;
+    private MovementQueueItem? sideTrackMovementItem;
     private List<MovementAction> movementActions;
     private BotViewCell? centerCell;
 
@@ -28,21 +29,16 @@ public class BotService
     {
         hasReceivedBotState = false;
 
-        if (botState!.DirectionState == BotAction.IDLE)
+        if (BotServiceHelpers.LastDirection == BotAction.IDLE)
         {
             //bot has been reset. Clear everything
             movementQueue = new();
             BotServiceHelpers.Goal = BotGoal.NONE;
         }
 
-        if (botState!.DirectionState != BotAction.IDLE)
-        {
-            //Console.WriteLine($"Cone View : {string.Join(", ", botView.CenterCellConeView(BotServiceHelpers.LastDirection.ToLocationDirection()).Select(x => x.Location))}");
-        }
-
         centerCell = botView.CenterCell();
         Console.WriteLine($"Center Cell = {centerCell.Location}");
-        Console.WriteLine($"PowerUps = {botState.PowerUp}");
+        Console.WriteLine($"PowerUps = {botState!.PowerUp}");
         Console.WriteLine($"Super PowerUps = {botState.SuperPowerUp}");
 
         if (movementQueue.Count > 0 && centerCell.CellType == BotServiceHelpers.MyTerritory && BotServiceHelpers.Goal == BotGoal.Capture)
@@ -62,7 +58,7 @@ public class BotService
         CellFinderResult? cornerCell = CellFinderService.FindCornerCell(botView, clockwiseView);
         CellFinderResult? lineCell = CellFinderService.FindLineCell(botView, clockwiseView);
 
-        Console.WriteLine($"Corner Found = {cornerCell?.Cell.Location}");
+        Console.WriteLine($"Corner Found = {cornerCell?.Cell.Location} == {centerCell.Location} {cornerCell != null && cornerCell.Cell.Location == centerCell.Location}");
         Console.WriteLine($"Line Found = {lineCell?.Cell.Location}");
 
         if (cornerCell != null && cornerCell.Cell.Location == centerCell.Location)
@@ -122,7 +118,7 @@ public class BotService
         if (botCommand != null) return botCommand;
 
         //return to starting location to try and find something
-        movementQueue = new() { new(startingLocation!, new (centerCell.Location.CommonDirection(startingLocation!), centerCell.Location.RotationFromDestination(startingLocation!))) };
+        movementQueue = new() { new(startingLocation!, new(centerCell.Location.CommonDirection(startingLocation!), centerCell.Location.RotationFromDestination(startingLocation!))) };
 
         botCommand = CommandFromQueue();
         if (botCommand != null) return botCommand;
@@ -151,27 +147,66 @@ public class BotService
 
     private BotCommand? CommandFromQueue()
     {
-        //queue has items. Move along the queue
-        if (movementQueue.Count > 0)
+        //queue has items. Move along the queue / or i have a sideTrack
+        if (movementQueue.Count > 0 || sideTrackMovementItem != null)
         {
-            MovementQueueItem thisMovement = movementQueue.First();
-
-            while (thisMovement.Destination == centerCell!.Location)
+            //check for side track first
+            MovementQueueItem? thisMovement = null;
+            if (sideTrackMovementItem != null)
             {
-                //we are at the destination - reset movements
-                movementActions = new();
-
-                movementQueue.RemoveAt(0);
-                if (movementQueue.Count > 0)
+                //Reached the side track
+                if (sideTrackMovementItem.Destination == centerCell!.Location)
                 {
-                    thisMovement = movementQueue.First();
+                    //reset side track - move back to the normal movementQueue
+                    thisMovement = null;
+                    sideTrackMovementItem = null;
+                    movementActions = new();
+
+                    //no other movements in the queue - so just exit
+                    if (movementQueue.Count == 0)
+                        return null;
                 }
-                else return null;
+                else
+                {
+                    thisMovement = sideTrackMovementItem;
+                }
+            }
+
+
+            if (thisMovement == null)
+            {
+                thisMovement = movementQueue.First();
+                while (thisMovement.Destination == centerCell!.Location)
+                {
+                    //we are at the destination - reset movements
+                    movementActions = new();
+
+                    movementQueue.RemoveAt(0);
+                    if (movementQueue.Count > 0)
+                    {
+                        //look for side tracks
+
+                        MovementQueueItem tempMovement = movementQueue.First();
+
+                        //Check in the cone view for the newest destination for a side track
+                        List<BotViewCell> coneView = botView.CenterCellConeView(tempMovement.Direction.Direction);
+                        if (coneView.Any(x => (x.IsTrail && x.CellType != BotServiceHelpers.MyTrail) || x.PowerUpType != PowerUpType.NONE))
+                        {
+                            sideTrackMovementItem = new(coneView.First(x => (x.IsTrail && x.CellType != BotServiceHelpers.MyTrail) || x.PowerUpType != PowerUpType.NONE).Location, tempMovement.Direction);
+                            thisMovement = sideTrackMovementItem;
+                        }
+                        else
+                        {
+                            thisMovement = movementQueue.First();
+                        }
+                    }
+                    else return null;
+                }
             }
 
             if (movementActions.Count <= 0 || !movementActions.AreMovementActionsSafe(botView))
             {
-                var moveToDestination = BotMovementService.MoveToDestination(centerCell.Location, thisMovement.Destination, botView, thisMovement.Direction.Rotation);
+                var moveToDestination = BotMovementService.MoveToDestination(centerCell!.Location, thisMovement.Destination, botView, thisMovement.Direction.Rotation);
                 movementActions = moveToDestination.MovementActions;
 
                 //TODO
@@ -206,6 +241,7 @@ public class BotService
 
             Console.WriteLine($"Movement Destination : {thisMovement.Destination}");
             Console.WriteLine($"Queue = {string.Join("; ", movementQueue.Select(x => x.Destination))}");
+            Console.WriteLine($"Side Track = {sideTrackMovementItem?.Destination}");
 
             if (movementActions.Count > 0)
             {
@@ -245,7 +281,7 @@ public class BotService
 
         BotServiceHelpers.LastDirection = botState.DirectionState;
 
-        if (botState.DirectionState == BotAction.IDLE)
+        if (BotServiceHelpers.LastDirection == BotAction.IDLE)
         {
             BotServiceHelpers.MyTerritory = botView.CenterCell().CellType;
             startingLocation = botView.CenterCell().Location;

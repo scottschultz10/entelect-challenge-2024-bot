@@ -120,11 +120,11 @@ namespace SproutReferenceBot.Services
                 {
                     //check each direction for safe movement
                     List<CellFinderDirection> tempDirections = new();
-                    if (canCaptureUp)
+                    if (canCaptureUp && upCell.CellType != CellType.OutOfBounds)
                     {
                         tempDirections.Add(new(LocationDirection.Up, RotationDirection.Clockwise));
                     }
-                    if (canCaptureLeft)
+                    if (canCaptureLeft && leftCell.CellType != CellType.OutOfBounds)
                     {
                         tempDirections.Add(new(LocationDirection.Left, RotationDirection.CounterClockwise));
                     }
@@ -140,11 +140,11 @@ namespace SproutReferenceBot.Services
                 else if (rightCell.CellType != BotServiceHelpers.MyTerritory && downCell.CellType == BotServiceHelpers.MyTerritory && leftCell.CellType == BotServiceHelpers.MyTerritory && upCell.CellType != BotServiceHelpers.MyTerritory)
                 {
                     List<CellFinderDirection> tempDirections = new();
-                    if (canCaptureRight)
+                    if (canCaptureRight && rightCell.CellType != CellType.OutOfBounds)
                     {
                         tempDirections.Add(new(LocationDirection.Right, RotationDirection.Clockwise));
                     }
-                    if (canCaptureUp)
+                    if (canCaptureUp && upCell.CellType != CellType.OutOfBounds)
                     {
                         tempDirections.Add(new(LocationDirection.Up, RotationDirection.CounterClockwise));
                     }
@@ -160,11 +160,11 @@ namespace SproutReferenceBot.Services
                 else if (rightCell.CellType != BotServiceHelpers.MyTerritory && downCell.CellType != BotServiceHelpers.MyTerritory && leftCell.CellType == BotServiceHelpers.MyTerritory && upCell.CellType == BotServiceHelpers.MyTerritory)
                 {
                     List<CellFinderDirection> tempDirections = new();
-                    if (canCaptureDown)
+                    if (canCaptureDown && downCell.CellType != CellType.OutOfBounds)
                     {
                         tempDirections.Add(new(LocationDirection.Down, RotationDirection.Clockwise));
                     }
-                    if (canCaptureRight)
+                    if (canCaptureRight && rightCell.CellType != CellType.OutOfBounds)
                     {
                         tempDirections.Add(new(LocationDirection.Right, RotationDirection.CounterClockwise));
                     }
@@ -180,11 +180,11 @@ namespace SproutReferenceBot.Services
                 else if (rightCell.CellType == BotServiceHelpers.MyTerritory && downCell.CellType != BotServiceHelpers.MyTerritory && leftCell.CellType != BotServiceHelpers.MyTerritory && upCell.CellType == BotServiceHelpers.MyTerritory)
                 {
                     List<CellFinderDirection> tempDirections = new();
-                    if (canCaptureLeft)
+                    if (canCaptureLeft && leftCell.CellType != CellType.OutOfBounds)
                     {
                         tempDirections.Add(new(LocationDirection.Left, RotationDirection.Clockwise));
                     }
-                    if (canCaptureDown)
+                    if (canCaptureDown && downCell.CellType != CellType.OutOfBounds)
                     {
                         tempDirections.Add(new(LocationDirection.Down, RotationDirection.CounterClockwise));
                     }
