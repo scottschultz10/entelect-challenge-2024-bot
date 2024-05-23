@@ -34,5 +34,4 @@ namespace SproutReferenceBot.Models
         public int Distance = distance;
         public int DirectionValue = directionValue;
     }
-
 }

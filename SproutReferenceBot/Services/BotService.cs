@@ -147,13 +147,25 @@ public class BotService
 
     private BotCommand? CommandFromQueue()
     {
+        //not capturing and in my territory - look for side tracks within my territory
+        if (centerCell!.CellType == BotServiceHelpers.MyTerritory && BotServiceHelpers.Goal != BotGoal.Capture && sideTrackMovementItem == null && BotServiceHelpers.LastDirection != BotAction.IDLE)
+        {
+            List<BotViewCell> coneView = botView.CenterCellConeView(BotServiceHelpers.LastDirection.ToLocationDirection());
+
+            if (coneView.Any(x => (x.IsTrail && x.CellType != BotServiceHelpers.MyTrail) || x.PowerUpType != PowerUpType.NONE))
+            {
+                //look for powerups and other bot trails first
+                sideTrackMovementItem = new(coneView.First(x => (x.IsTrail && x.CellType != BotServiceHelpers.MyTrail) || x.PowerUpType != PowerUpType.NONE).Location, new(BotServiceHelpers.LastDirection.ToLocationDirection(), RotationDirection.Clockwise));
+            }
+        }
+
         //queue has items. Move along the queue / or i have a sideTrack
         if (movementQueue.Count > 0 || sideTrackMovementItem != null)
         {
             /*TODO: For sidetrack. Expand on when the bot checks for side track 
-             * Check cone view on old direction + new direction 
              * Increase cone view, add more surrounding cells close to bot
-             * maybe: check for sidetrack whenever sidetrack is null
+             * 
+             * ALSO: Always look for sidetracks when not capturing. Within territory, other bots and powerups
             */
 
             //check for side track first
@@ -178,7 +190,6 @@ public class BotService
                 }
             }
 
-
             if (thisMovement == null)
             {
                 thisMovement = movementQueue.First();
@@ -191,14 +202,26 @@ public class BotService
                     if (movementQueue.Count > 0)
                     {
                         //look for side tracks
-
                         MovementQueueItem tempMovement = movementQueue.First();
 
                         //Check in the cone view for the newest destination for a side track
                         List<BotViewCell> coneView = botView.CenterCellConeView(tempMovement.Direction.Direction);
+                        //add a cone view for the current direction as well - less priority
+                        coneView.AddRange(botView.CenterCellConeView(BotServiceHelpers.LastDirection.ToLocationDirection()));
+
+                        //get a view of all cells in a line in the last direction
+                        List<BotViewCell> lineView = botView.CenterCellDirectionView(BotServiceHelpers.LastDirection.ToLocationDirection());
+
                         if (coneView.Any(x => (x.IsTrail && x.CellType != BotServiceHelpers.MyTrail) || x.PowerUpType != PowerUpType.NONE))
                         {
+                            //look for powerups and other bot trails first
                             sideTrackMovementItem = new(coneView.First(x => (x.IsTrail && x.CellType != BotServiceHelpers.MyTrail) || x.PowerUpType != PowerUpType.NONE).Location, tempMovement.Direction);
+                            thisMovement = sideTrackMovementItem;
+                        }
+                        else if (BotServiceHelpers.Goal == BotGoal.Capture && lineView.Any(x => x.CellType == BotServiceHelpers.MyTerritory) && BotServiceHelpers.LastDirection != BotAction.IDLE)
+                        {
+                            //then look for my territory if I am capturing - find close cell to stop capturing at
+                            sideTrackMovementItem = new(lineView.First(x => x.CellType == BotServiceHelpers.MyTerritory).Location, new(BotServiceHelpers.LastDirection.ToLocationDirection(), tempMovement.Direction.Rotation));
                             thisMovement = sideTrackMovementItem;
                         }
                         else

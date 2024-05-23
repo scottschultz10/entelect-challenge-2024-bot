@@ -188,7 +188,7 @@ namespace SproutReferenceBot.Services
                     {
                         tempDirections.Add(new(LocationDirection.Down, RotationDirection.CounterClockwise));
                     }
-        
+
                     if (tempDirections.Count > 0)
                     {
                         cellFinder.Directions = tempDirections;
@@ -274,11 +274,15 @@ namespace SproutReferenceBot.Services
                     //up empty line
                     if (upCell.CellType != CellType.OutOfBounds)
                     {
-                        cellFinder.Directions = new()
+                        //check which direction to go in
+                        if (CountMyTerritory(botView, new CellFinderDirection(LocationDirection.Up, RotationDirection.Clockwise)) <= CountMyTerritory(botView, new CellFinderDirection(LocationDirection.Up, RotationDirection.CounterClockwise)))
                         {
-                            new CellFinderDirection(LocationDirection.Up, RotationDirection.Clockwise),
-                            new CellFinderDirection(LocationDirection.Up, RotationDirection.CounterClockwise),
-                        };
+                            cellFinder.Directions = new() { new CellFinderDirection(LocationDirection.Up, RotationDirection.Clockwise) };
+                        }
+                        else
+                        {
+                            cellFinder.Directions = new() { new CellFinderDirection(LocationDirection.Up, RotationDirection.CounterClockwise) };
+                        }
 
                         //check that the initial capture path is safe 
                         cellFinder.CanCapture = CanCaptureDirection(cell.Location, LocationDirection.Up, botView);
@@ -295,14 +299,17 @@ namespace SproutReferenceBot.Services
                     //right empty line
                     if (rightCell.CellType != CellType.OutOfBounds)
                     {
-                        cellFinder.Directions = new()
+                        if (CountMyTerritory(botView, new CellFinderDirection(LocationDirection.Right, RotationDirection.Clockwise)) <= CountMyTerritory(botView, new CellFinderDirection(LocationDirection.Right, RotationDirection.CounterClockwise)))
                         {
-                            new CellFinderDirection(LocationDirection.Right, RotationDirection.Clockwise),
-                            new CellFinderDirection(LocationDirection.Right, RotationDirection.CounterClockwise),
-                        };
+                            cellFinder.Directions = new() { new CellFinderDirection(LocationDirection.Right, RotationDirection.Clockwise) };
+                        }
+                        else
+                        {
+                            cellFinder.Directions = new() { new CellFinderDirection(LocationDirection.Right, RotationDirection.CounterClockwise) };
+                        }
+
                         //check that the initial capture path is safe 
                         cellFinder.CanCapture = CanCaptureDirection(cell.Location, LocationDirection.Right, botView);
-
                     }
                     else
                     {
@@ -316,11 +323,15 @@ namespace SproutReferenceBot.Services
                     //down empty line
                     if (downCell.CellType != CellType.OutOfBounds)
                     {
-                        cellFinder.Directions = new()
+                        if (CountMyTerritory(botView, new CellFinderDirection(LocationDirection.Down, RotationDirection.Clockwise)) <= CountMyTerritory(botView, new CellFinderDirection(LocationDirection.Down, RotationDirection.CounterClockwise)))
                         {
-                            new CellFinderDirection(LocationDirection.Down, RotationDirection.Clockwise),
-                            new CellFinderDirection(LocationDirection.Down, RotationDirection.CounterClockwise),
-                        };
+                            cellFinder.Directions = new() { new CellFinderDirection(LocationDirection.Down, RotationDirection.Clockwise) };
+                        }
+                        else
+                        {
+                            cellFinder.Directions = new() { new CellFinderDirection(LocationDirection.Down, RotationDirection.CounterClockwise) };
+                        }
+
                         //check that the initial capture path is safe 
                         cellFinder.CanCapture = CanCaptureDirection(cell.Location, LocationDirection.Down, botView);
 
@@ -337,14 +348,17 @@ namespace SproutReferenceBot.Services
                     //left empty line
                     if (leftCell.CellType != CellType.OutOfBounds)
                     {
-                        cellFinder.Directions = new()
+                        if (CountMyTerritory(botView, new CellFinderDirection(LocationDirection.Left, RotationDirection.Clockwise)) <= CountMyTerritory(botView, new CellFinderDirection(LocationDirection.Left, RotationDirection.CounterClockwise)))
                         {
-                            new CellFinderDirection(LocationDirection.Left, RotationDirection.Clockwise),
-                            new CellFinderDirection(LocationDirection.Left, RotationDirection.CounterClockwise),
-                        };
+                            cellFinder.Directions = new() { new CellFinderDirection(LocationDirection.Left, RotationDirection.Clockwise) };
+                        }
+                        else
+                        {
+                            cellFinder.Directions = new() { new CellFinderDirection(LocationDirection.Left, RotationDirection.CounterClockwise) };
+                        }
+
                         //check that the initial capture path is safe 
                         cellFinder.CanCapture = CanCaptureDirection(cell.Location, LocationDirection.Left, botView);
-
                     }
                     else
                     {
@@ -364,14 +378,65 @@ namespace SproutReferenceBot.Services
                 //group lines with the same priorities
                 //then pick a random line from that group
                 var groupedLines = (from line in allLines
-                                    group line by new { line.Priority.DirectionValue, line.Priority.Distance } into grp
-                                    orderby (grp.Key.DirectionValue / 3) ascending, grp.Key.Distance ascending
+                                    group line by new { line.Priority.DirectionValue, Distance = (line.Priority.Distance / 3) } into grp
+                                    orderby grp.Key.DirectionValue ascending, grp.Key.Distance ascending
                                     select grp.ToList()).First();
 
                 Random randCorner = new();
-                return groupedLines[randCorner.Next(0, groupedLines.Count)];
+
+                var returnLine = groupedLines[randCorner.Next(0, groupedLines.Count)];
+
+                //testing
+                Console.WriteLine($"Line Capture Cells in {returnLine.Directions.First().Direction} = Clockwise ({CountMyTerritory(botView, new(returnLine.Directions.First().Direction, RotationDirection.Clockwise))}) == CounterClockwise {CountMyTerritory(botView, new(returnLine.Directions.First().Direction, RotationDirection.CounterClockwise))}");
+
+                return returnLine;
             }
             else return null;
+        }
+
+        /// <summary>
+        /// Count the number of cells of myTerritory in two directions (e.g. all cells down and right of the center cell)
+        /// </summary>
+        public static int CountMyTerritory(BotView botView, CellFinderDirection direction)
+        {
+            BotViewCell centerCell = botView.CenterCell();
+            //get all cells in two directions
+            Location direction1 = direction.Direction;
+            Location direction2;
+            if (direction.Rotation == RotationDirection.Clockwise)
+            {
+                direction2 = direction.Direction.NextClockwiseDirection();
+            }
+            else
+            {
+                direction2 = direction.Direction.NextCounterClockwiseDirection();
+            }
+
+            Location currentLocation = centerCell.Location.Move(direction1);
+            Location previousLocation = centerCell.Location;
+
+            int myTerritoryCount = 0;
+            //move in 1 direction slowly
+            while (botView.CellByLocation(currentLocation) != null)
+            {
+                //move in all direction2 for a single direction1
+                //e.g. do all x cells for this y
+                while (botView.CellByLocation(currentLocation) != null)
+                {
+                    currentLocation = currentLocation.Move(direction2);
+
+                    if (botView.CellByLocation(currentLocation)?.CellType == BotServiceHelpers.MyTerritory)
+                    {
+                        myTerritoryCount++;
+                    }
+                }
+
+                //reset to base direction2 and move up direction1
+                currentLocation = previousLocation.Move(direction1);
+                previousLocation = currentLocation;
+            }
+
+            return myTerritoryCount;
         }
 
     }

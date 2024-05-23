@@ -102,6 +102,23 @@ namespace SproutReferenceBot.Models
             return returnView.OrderBy(x => centerCell.Location.DistanceTo(x.Location)).ThenBy(x => (centerCell.Location.CommonDirection(x.Location) == direction) ? -1 : 1).ToList();
         }
 
+        /// <summary>
+        /// Get all cells in a straight line in the given direction from the center cell within the bot view
+        /// </summary>
+        public List<BotViewCell> CenterCellDirectionView(Location direction)
+        {
+            Location currentLocation = CenterCell().Location.Move(direction);
+
+            List<BotViewCell> returnView = new();
+            while(CellByLocation(currentLocation) != null)
+            {
+                returnView.Add(CellByLocation(currentLocation)!);
+                currentLocation = currentLocation.Move(direction);
+            }
+
+            return returnView;
+        }
+
         public List<BotViewCell> CellBufferByLocation(Location location)
         {
             List<Location> allBuffers = new()
