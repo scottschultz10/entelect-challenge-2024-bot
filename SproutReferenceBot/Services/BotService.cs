@@ -164,8 +164,6 @@ public class BotService
         {
             /*TODO: For sidetrack. Expand on when the bot checks for side track 
              * Increase cone view, add more surrounding cells close to bot
-             * 
-             * ALSO: Always look for sidetracks when not capturing. Within territory, other bots and powerups
             */
 
             //check for side track first
@@ -227,6 +225,12 @@ public class BotService
                         else
                         {
                             thisMovement = movementQueue.First();
+                        }
+
+                        //offset the destination to avoid going back on myself - only if there is still more than one destination left
+                        if (sideTrackMovementItem != null && movementQueue.Count > 1)
+                        {
+                            movementQueue[0].Destination = movementQueue[0].Destination.Move(sideTrackMovementItem.Destination.Difference(centerCell!.Location));
                         }
                     }
                     else return null;

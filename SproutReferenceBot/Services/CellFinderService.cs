@@ -382,14 +382,8 @@ namespace SproutReferenceBot.Services
                                     orderby grp.Key.DirectionValue ascending, grp.Key.Distance ascending
                                     select grp.ToList()).First();
 
-                Random randCorner = new();
-
-                var returnLine = groupedLines[randCorner.Next(0, groupedLines.Count)];
-
-                //testing
-                Console.WriteLine($"Line Capture Cells in {returnLine.Directions.First().Direction} = Clockwise ({CountMyTerritory(botView, new(returnLine.Directions.First().Direction, RotationDirection.Clockwise))}) == CounterClockwise {CountMyTerritory(botView, new(returnLine.Directions.First().Direction, RotationDirection.CounterClockwise))}");
-
-                return returnLine;
+                Random randLine = new();
+                return groupedLines[randLine.Next(0, groupedLines.Count)];
             }
             else return null;
         }
