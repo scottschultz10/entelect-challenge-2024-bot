@@ -88,6 +88,12 @@ namespace SproutReferenceBot.Models
 
     public static class LocationExtensions
     {
+        public static Location OppositeDirection(this Location direction)
+        {
+            Console.WriteLine($"Opposite direction {direction} - {new Location(direction.X * -1, direction.Y * -1)} ");
+            return new(direction.X * -1, direction.Y * -1);
+        }
+        
         public static Location NextClockwiseDirection(this Location direction)
         {
             if (direction == LocationDirection.Right)

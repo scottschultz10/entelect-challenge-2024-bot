@@ -13,6 +13,7 @@ public class BotService
     private List<MovementQueueItem> movementQueue;
     private MovementQueueItem? sideTrackMovementItem;
     private List<MovementAction> movementActions;
+    private HashSet<Location> blacklistLocations;
     private BotViewCell? centerCell;
 
     private Location? startingLocation;
@@ -23,6 +24,7 @@ public class BotService
         clockwiseView = new();
         movementQueue = new();
         movementActions = new();
+        blacklistLocations = new();
     }
 
     public BotCommand ProcessState()
@@ -48,8 +50,28 @@ public class BotService
         if (movementQueue.Count > 0 && centerCell.CellType == BotServiceHelpers.MyTerritory && BotServiceHelpers.Goal == BotGoal.Capture)
         {
             //if I am standing in my own territory after capture. Cancel all queued actions and do something new
+            if (BotServiceHelpers.LastDirection != BotAction.IDLE)
+            {
+                //check if I actually captured territory. If not mark it as a no go capture. Probably a spawn
+                BotViewCell? behindCell = botView.CellByLocation(centerCell.Location.Move(BotServiceHelpers.LastDirection.ToLocationDirection().OppositeDirection()));
+
+                if (behindCell != null && behindCell.CellType != BotServiceHelpers.MyTerritory)
+                {
+                    //did not capture / blacklist all visible cells of matching type in the botView
+                    foreach(BotViewCell blacklistCell in clockwiseView.FindAll(x => x.CellType == behindCell.CellType))
+                    {
+                        //blacklist the buffers as well. To keep clear
+                        foreach(BotViewCell buffer in botView.CellBufferByLocation(blacklistCell.Location))
+                        {
+                            blacklistLocations.Add(buffer.Location);
+                        }
+                    }
+                }
+            }
+
             movementQueue = new();
         }
+
 
         BotCommand? botCommand;
         if (BotServiceHelpers.Goal != BotGoal.MoveAlongLine && BotServiceHelpers.Goal != BotGoal.MoveToLine && BotServiceHelpers.Goal != BotGoal.MoveToCorner)
@@ -67,8 +89,13 @@ public class BotService
 
         //if there are any other bots within view, don't capture
         bool anyVisibleBots = clockwiseView.Any(x => x.HasBot && !x.IsMe);
+        //cannot capture this location, it has been blacklisted previously
+        bool isCaptureBlacklisted = blacklistLocations.Contains(centerCell.Location);
 
-        if (!anyVisibleBots)
+        //combine above checks
+        bool isCenterCellCapturable = !anyVisibleBots && !isCaptureBlacklisted;
+
+        if (isCenterCellCapturable)
         {
             if (cornerCell != null && cornerCell.Cell.Location == centerCell.Location)
             {
@@ -106,7 +133,7 @@ public class BotService
         {
             if (lineCell.Cell.Location == centerCell.Location)
             {
-                if (lineCell.CanCapture && !anyVisibleBots)
+                if (lineCell.CanCapture && isCenterCellCapturable)
                 {
                     movementQueue = BotMovementService.CaptureTerritory(lineCell, botView);
                     BotServiceHelpers.Goal = BotGoal.Capture;
