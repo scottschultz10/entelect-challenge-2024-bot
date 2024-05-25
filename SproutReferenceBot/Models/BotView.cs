@@ -14,15 +14,18 @@ namespace SproutReferenceBot.Models
     {
         private List<List<BotViewCell>> cells;
         public List<List<BotViewCell>> Cells { get { return cells; } }
+        private Dictionary<Location, BotViewCell> cellsDictionary;
 
         public BotView()
         {
             cells = new();
+            cellsDictionary = new();
         }
 
         public void SetBotView(BotStateDTO botState)
         {
             cells = new();
+            cellsDictionary = new();
 
             //my bot will always be in 4, 4. So populate X,Y based on that
             int botX = botState.X;
@@ -43,9 +46,9 @@ namespace SproutReferenceBot.Models
 
                     CellType cellType = botState.HeroWindow[x][y];
 
-                    PowerUpType powerUpType = botState.PowerUpLocations?.FirstOrDefault(x => x.Location == new Location(cellX, cellY))?.Type ?? PowerUpType.NONE;
+                    PowerUpType powerUpType = botState.PowerUpLocations?.FirstOrDefault(x => (x.Location ?? LocationDirection.NONE) == new Location(cellX, cellY))?.Type ?? PowerUpType.NONE;
 
-                    cells[x].Add(new()
+                    BotViewCell cell = new()
                     {
                         Location = new(cellX, cellY),
                         IsMe = isMe,
@@ -53,7 +56,10 @@ namespace SproutReferenceBot.Models
                         HasWeed = hasWeed,
                         CellType = cellType,
                         PowerUpType = powerUpType
-                    });
+                    };
+
+                    cells[x].Add(cell);
+                    cellsDictionary.Add(new(cellX, cellY), cell);
                 }
             }
         }
@@ -181,33 +187,11 @@ namespace SproutReferenceBot.Models
         /// <returns>The BotViewCell associated with the sent in location. If no location is found return null</returns>
         public BotViewCell? CellByLocation(Location location)
         {
-            if (cells.Count <=  0 || cells[^1].Count <= 0)
+            if (cellsDictionary.TryGetValue(location, out BotViewCell? cell))
             {
-                return null;
+                return cell;
             }
-
-            //get the top-left cell and bottom-right cell as a reference / validation
-            BotViewCell topLeft = cells[0][0];
-            BotViewCell bottomRight = cells[cells.Count - 1][cells[0].Count - 1];
-
-            //so if the location has any X / Y value lower than the topLeft
-            // or the location has any X / Y value higher than the bottomRight
-            if (topLeft.Location.X > location.X || location.X > bottomRight.Location.X
-                || topLeft.Location.Y > location.Y || location.Y > bottomRight.Location.Y)
-            {
-                return null;
-            }
-
-            //find how far away location is from 0,0
-            //the difference is the index in the cells list
-            Location index = location.Difference(topLeft.Location);
-            
-            if (index.X > cells.Count || index.Y > cells[^1].Count)
-            {
-                return null;
-            }
-
-            return cells[index.X][index.Y];
+            else return null;
         }
 
         public string PrintBotView()

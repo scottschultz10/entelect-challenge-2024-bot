@@ -44,7 +44,7 @@ namespace SproutReferenceBot.Models
 
             foreach (PropertyInfo property in properties)
             {
-                if (property.PropertyType == typeof(Location) && (Location?)property.GetValue(null) == this)
+                if (property.PropertyType == typeof(Location) && ((Location?)property.GetValue(null) ?? LocationDirection.NONE) == this)
                 {
                     return $"LocationQuadrant.{property.Name}, ({X}, {Y})";
                 }
@@ -55,7 +55,7 @@ namespace SproutReferenceBot.Models
 
         public override int GetHashCode()
         {
-            throw new NotImplementedException();
+            return HashCode.Combine(X, Y);
         }
     }
 
@@ -137,6 +137,34 @@ namespace SproutReferenceBot.Models
         public static Location Move(this Location location, Location direction, int magnitude = 1)
         {
             return new(location.X + (direction.X * magnitude), location.Y + (direction.Y * magnitude));
+        }
+
+        /// <summary>
+        /// Offset the location by only 1 cardinal. So don't go longer just wider for example
+        /// </summary>
+        /// <param name="location">Location to be offset</param>
+        /// <param name="offset">The Offset</param>
+        /// <param name="direction">The Main direction, from CellFinderResult</param>
+        /// <returns></returns>
+        public static Location MoveOffset(this Location location, Location offset, Location direction)
+        {
+            Location actualOffset;
+            if (direction == LocationDirection.Left || direction == LocationDirection.Right)
+            {
+                //only offset on Y axis
+                actualOffset = new(0, offset.Y);
+            }
+            else if (direction == LocationDirection.Up || direction == LocationDirection.Down)
+            {
+                //only offset on X axis
+                actualOffset = new(offset.X, 0);
+            }
+            else
+            {
+                actualOffset = offset;
+            }
+
+            return location.Move(actualOffset);
         }
 
         /// <summary>

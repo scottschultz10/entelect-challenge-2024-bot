@@ -33,13 +33,17 @@ public class BotService
         {
             //bot has been reset. Clear everything
             movementQueue = new();
+            sideTrackMovementItem = null;
             BotServiceHelpers.Goal = BotGoal.NONE;
         }
 
         centerCell = botView.CenterCell();
         Console.WriteLine($"Center Cell = {centerCell.Location}");
-        Console.WriteLine($"PowerUps = {botState!.PowerUp}");
-        Console.WriteLine($"Super PowerUps = {botState.SuperPowerUp}");
+        //Console.WriteLine($"PowerUps = {botState!.PowerUp}");
+        //Console.WriteLine($"Super PowerUps = {botState.SuperPowerUp}");
+
+        Console.WriteLine($"Bot Positions: {string.Join(", ", botState!.BotPostions?.Select(x => x.ToString()) ?? [])}");
+        Console.WriteLine($"Leaderboard: {string.Join(", ", botState!.LeaderBoard?.Select(x => x.Key + " " + x.Value) ?? [])}");
 
         if (movementQueue.Count > 0 && centerCell.CellType == BotServiceHelpers.MyTerritory && BotServiceHelpers.Goal == BotGoal.Capture)
         {
@@ -61,22 +65,28 @@ public class BotService
         Console.WriteLine($"Corner Found = {cornerCell?.Cell.Location} == {centerCell.Location} {cornerCell != null && cornerCell.Cell.Location == centerCell.Location}");
         Console.WriteLine($"Line Found = {lineCell?.Cell.Location}");
 
-        if (cornerCell != null && cornerCell.Cell.Location == centerCell.Location)
+        //if there are any other bots within view, don't capture
+        bool anyVisibleBots = clockwiseView.Any(x => x.HasBot && !x.IsMe);
+
+        if (!anyVisibleBots)
         {
-            movementQueue = BotMovementService.CaptureTerritory(cornerCell, botView);
-            BotServiceHelpers.Goal = BotGoal.Capture;
+            if (cornerCell != null && cornerCell.Cell.Location == centerCell.Location)
+            {
+                movementQueue = BotMovementService.CaptureTerritory(cornerCell, botView);
+                BotServiceHelpers.Goal = BotGoal.Capture;
 
-            botCommand = CommandFromQueue();
-            if (botCommand != null) return botCommand;
-        }
+                botCommand = CommandFromQueue();
+                if (botCommand != null) return botCommand;
+            }
 
-        if (lineCell != null && lineCell.Cell.Location == centerCell.Location && lineCell.CanCapture)
-        {
-            movementQueue = BotMovementService.CaptureTerritory(lineCell, botView);
-            BotServiceHelpers.Goal = BotGoal.Capture;
+            if (lineCell != null && lineCell.Cell.Location == centerCell.Location && lineCell.CanCapture)
+            {
+                movementQueue = BotMovementService.CaptureTerritory(lineCell, botView);
+                BotServiceHelpers.Goal = BotGoal.Capture;
 
-            botCommand = CommandFromQueue();
-            if (botCommand != null) return botCommand;
+                botCommand = CommandFromQueue();
+                if (botCommand != null) return botCommand;
+            }
         }
 
         if (cornerCell != null)
@@ -96,7 +106,7 @@ public class BotService
         {
             if (lineCell.Cell.Location == centerCell.Location)
             {
-                if (lineCell.CanCapture)
+                if (lineCell.CanCapture && !anyVisibleBots)
                 {
                     movementQueue = BotMovementService.CaptureTerritory(lineCell, botView);
                     BotServiceHelpers.Goal = BotGoal.Capture;
@@ -147,17 +157,51 @@ public class BotService
 
     private BotCommand? CommandFromQueue()
     {
-        //not capturing and in my territory - look for side tracks within my territory
-        if (centerCell!.CellType == BotServiceHelpers.MyTerritory && BotServiceHelpers.Goal != BotGoal.Capture && sideTrackMovementItem == null && BotServiceHelpers.LastDirection != BotAction.IDLE)
+        if (BotServiceHelpers.LastDirection != BotAction.IDLE)
         {
-            List<BotViewCell> coneView = botView.CenterCellConeView(BotServiceHelpers.LastDirection.ToLocationDirection());
-
-            if (coneView.Any(x => (x.IsTrail && x.CellType != BotServiceHelpers.MyTrail) || x.PowerUpType != PowerUpType.NONE))
+            //not capturing and in my territory - look for side tracks within my territory
+            if (centerCell!.CellType == BotServiceHelpers.MyTerritory && BotServiceHelpers.Goal != BotGoal.Capture && sideTrackMovementItem == null)
             {
-                //look for powerups and other bot trails first
-                sideTrackMovementItem = new(coneView.First(x => (x.IsTrail && x.CellType != BotServiceHelpers.MyTrail) || x.PowerUpType != PowerUpType.NONE).Location, new(BotServiceHelpers.LastDirection.ToLocationDirection(), RotationDirection.Clockwise));
+                List<BotViewCell> coneView = botView.CenterCellConeView(BotServiceHelpers.LastDirection.ToLocationDirection());
+
+                if (coneView.Any(x => (x.IsTrail && x.CellType != BotServiceHelpers.MyTrail) || x.PowerUpType != PowerUpType.NONE))
+                {
+                    //look for powerups and other bot trails first
+                    sideTrackMovementItem = new(coneView.First(x => (x.IsTrail && x.CellType != BotServiceHelpers.MyTrail) || x.PowerUpType != PowerUpType.NONE).Location, new(BotServiceHelpers.LastDirection.ToLocationDirection(), RotationDirection.Clockwise));
+                }
+            }
+            else if (movementQueue.Count > 0 && sideTrackMovementItem == null)
+            {
+                //else look for normal capture side tracks
+                MovementQueueItem tempMovement = movementQueue.First();
+
+                //Check in the cone view for the newest destination for a side track
+                List<BotViewCell> coneView = botView.CenterCellConeView(tempMovement.Direction.Direction);
+                //add a cone view for the current direction as well - less priority
+                coneView.AddRange(botView.CenterCellConeView(BotServiceHelpers.LastDirection.ToLocationDirection()));
+
+                //get a view of all cells in a line in the last direction
+                List<BotViewCell> lineView = botView.CenterCellDirectionView(BotServiceHelpers.LastDirection.ToLocationDirection());
+
+                if (coneView.Any(x => (x.IsTrail && x.CellType != BotServiceHelpers.MyTrail) || x.PowerUpType != PowerUpType.NONE))
+                {
+                    //look for powerups and other bot trails first
+                    sideTrackMovementItem = new(coneView.First(x => (x.IsTrail && x.CellType != BotServiceHelpers.MyTrail) || x.PowerUpType != PowerUpType.NONE).Location, tempMovement.Direction);
+                }
+                else if (BotServiceHelpers.Goal == BotGoal.Capture && centerCell.CellType != BotServiceHelpers.MyTerritory && lineView.Any(x => x.CellType == BotServiceHelpers.MyTerritory))
+                {
+                    //then look for my territory if I am capturing - find close cell to stop capturing at
+                    sideTrackMovementItem = new(lineView.First(x => x.CellType == BotServiceHelpers.MyTerritory).Location, new(BotServiceHelpers.LastDirection.ToLocationDirection(), tempMovement.Direction.Rotation));
+                }
+
+                //offset the destination to avoid going back on myself - only if there is still more than one destination left
+                if (sideTrackMovementItem != null && movementQueue.Count > 1)
+                {
+                    movementQueue[0].Destination = movementQueue[0].Destination.MoveOffset(sideTrackMovementItem.Destination.Difference(centerCell!.Location), movementQueue[0].Direction.Direction);
+                }
             }
         }
+
 
         //queue has items. Move along the queue / or i have a sideTrack
         if (movementQueue.Count > 0 || sideTrackMovementItem != null)
@@ -171,7 +215,11 @@ public class BotService
             if (sideTrackMovementItem != null)
             {
                 //Reached the side track
-                if (sideTrackMovementItem.Destination == centerCell!.Location)
+                //or the side track is no longer there
+                BotViewCell? sideTrackCell = botView.CellByLocation(sideTrackMovementItem.Destination);
+                if (sideTrackMovementItem.Destination == centerCell!.Location
+                    || sideTrackCell == null
+                    || (!sideTrackCell.IsTrail && sideTrackCell.PowerUpType == PowerUpType.NONE && sideTrackCell.CellType != BotServiceHelpers.MyTerritory))
                 {
                     //reset side track - move back to the normal movementQueue
                     thisMovement = null;
@@ -199,39 +247,7 @@ public class BotService
                     movementQueue.RemoveAt(0);
                     if (movementQueue.Count > 0)
                     {
-                        //look for side tracks
-                        MovementQueueItem tempMovement = movementQueue.First();
-
-                        //Check in the cone view for the newest destination for a side track
-                        List<BotViewCell> coneView = botView.CenterCellConeView(tempMovement.Direction.Direction);
-                        //add a cone view for the current direction as well - less priority
-                        coneView.AddRange(botView.CenterCellConeView(BotServiceHelpers.LastDirection.ToLocationDirection()));
-
-                        //get a view of all cells in a line in the last direction
-                        List<BotViewCell> lineView = botView.CenterCellDirectionView(BotServiceHelpers.LastDirection.ToLocationDirection());
-
-                        if (coneView.Any(x => (x.IsTrail && x.CellType != BotServiceHelpers.MyTrail) || x.PowerUpType != PowerUpType.NONE))
-                        {
-                            //look for powerups and other bot trails first
-                            sideTrackMovementItem = new(coneView.First(x => (x.IsTrail && x.CellType != BotServiceHelpers.MyTrail) || x.PowerUpType != PowerUpType.NONE).Location, tempMovement.Direction);
-                            thisMovement = sideTrackMovementItem;
-                        }
-                        else if (BotServiceHelpers.Goal == BotGoal.Capture && lineView.Any(x => x.CellType == BotServiceHelpers.MyTerritory) && BotServiceHelpers.LastDirection != BotAction.IDLE)
-                        {
-                            //then look for my territory if I am capturing - find close cell to stop capturing at
-                            sideTrackMovementItem = new(lineView.First(x => x.CellType == BotServiceHelpers.MyTerritory).Location, new(BotServiceHelpers.LastDirection.ToLocationDirection(), tempMovement.Direction.Rotation));
-                            thisMovement = sideTrackMovementItem;
-                        }
-                        else
-                        {
-                            thisMovement = movementQueue.First();
-                        }
-
-                        //offset the destination to avoid going back on myself - only if there is still more than one destination left
-                        if (sideTrackMovementItem != null && movementQueue.Count > 1)
-                        {
-                            movementQueue[0].Destination = movementQueue[0].Destination.Move(sideTrackMovementItem.Destination.Difference(centerCell!.Location));
-                        }
+                        thisMovement = movementQueue.First();
                     }
                     else return null;
                 }
@@ -248,7 +264,7 @@ public class BotService
                 if (moveToDestination.HasBeenOffset)
                 {
                     Console.WriteLine($"Offsetting the by: {moveToDestination.OffsetDifference} -> {thisMovement.Destination} = {thisMovement.Destination.Move(moveToDestination.OffsetDifference)}");
-                    thisMovement.Destination = thisMovement.Destination.Move(moveToDestination.OffsetDifference);
+                    thisMovement.Destination = thisMovement.Destination.MoveOffset(moveToDestination.OffsetDifference, thisMovement.Direction.Direction);
                 }
             }
 
