@@ -358,15 +358,16 @@ namespace SproutReferenceBot.Services
             Location currentDirection = direction.Direction;
             Location currentLocation = cell;
 
-            int directionMax = 4;
+            Queue<int> directionLengths = new();
+            directionLengths.Enqueue(3);
+            directionLengths.Enqueue(6);
+            directionLengths.Enqueue(4);
+            directionLengths.Enqueue(6);
 
-            for (int directionChangeCount = 0; directionChangeCount < 4; directionChangeCount++)
+            while (directionLengths.Count > 0)
             {
                 //increase the max to avoid colliding with ourselves
-                if (directionChangeCount == 1)
-                {
-                    directionMax += 2;
-                }
+                int directionMax = directionLengths.Dequeue();
 
                 List<(Location Location, BotViewCell? Cell)?> cells = new();
                 for (int i = 1; i <= directionMax; i++)
