@@ -43,7 +43,7 @@ connection.On<Guid>("Registered",
     (id) =>
     {
         Console.WriteLine($"Registered: {id}");
-        botService.SetBotId(id);
+        BotService.SetBotId(id);
     });
 
 connection.On<string>(

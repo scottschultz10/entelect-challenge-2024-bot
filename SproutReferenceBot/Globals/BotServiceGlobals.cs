@@ -1,7 +1,11 @@
 ﻿using SproutReferenceBot.Enums;
+using SproutReferenceBot.Models;
 
-internal static class BotServiceHelpers
+namespace SproutReferenceBot.Globals;
+
+internal static class BotServiceGlobals
 {
+    public static Guid BotID { get; set; }
     public static CellType MyTerritory { get; set; }
     public static BotGoal Goal { get; set; }
     public static BotAction LastDirection { get; set; }
@@ -13,4 +17,5 @@ internal static class BotServiceHelpers
         CellType.Bot3Territory => CellType.Bot3Trail,
         _ => CellType.Bot0Trail,
     };
+    public static int GameTick { get; set; }
 }
