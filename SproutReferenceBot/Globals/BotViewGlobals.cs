@@ -16,5 +16,4 @@ namespace SproutReferenceBot.Globals
             EntireView = [];
         }
     }
-
 }

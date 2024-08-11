@@ -19,7 +19,7 @@ namespace SproutReferenceBot.Models
         {
             Cell = cell;
             Priority = priority;
-            Directions = new();
+            Directions = [];
         }
     }
 

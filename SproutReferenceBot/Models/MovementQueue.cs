@@ -1,4 +1,5 @@
 ﻿using SproutReferenceBot.Enums;
+using SproutReferenceBot.Extensions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -24,9 +25,9 @@ namespace SproutReferenceBot.Models
         public BotAction Action = action;
         public Location Location = location;
 
-        public BotViewCell? GetBotViewCell(BotView botView)
+        public BotViewCell? GetBotViewCell()
         {
-            return botView.CellByLocation(Location);
+            return Location.ToBotViewCell();
         }
 
         public override string ToString()

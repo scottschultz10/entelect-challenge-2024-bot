@@ -9,9 +9,8 @@ namespace SproutReferenceBot.Enums
     public enum BotGoal
     {
         NONE = 0,
-        MoveToCorner = 1,
-        MoveToLine = 2,
-        MoveAlongLine = 3,
-        Capture = 4,
+        MoveToCaptureCell = 1,
+        MoveAlongLine = 2,
+        Capture = 3,
     }
 }

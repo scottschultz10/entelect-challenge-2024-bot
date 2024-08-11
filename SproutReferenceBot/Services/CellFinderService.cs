@@ -1,4 +1,6 @@
-﻿using SproutReferenceBot.Enums;
+﻿using Microsoft.Extensions.Options;
+using SproutReferenceBot.Enums;
+using SproutReferenceBot.Extensions;
 using SproutReferenceBot.Globals;
 using SproutReferenceBot.Models;
 using System;
@@ -14,14 +16,44 @@ namespace SproutReferenceBot.Services
 
     public static class CellFinderService
     {
-
         /// <summary>
-        /// From a 1d view find the closest corner to the bot. A corner is defined as 2 adjacent cells of BotServiceHelpers.MyTerritory and the remaining 2 adjacent cells of another cell type)
+        /// Combine FindCornerCell and FindLineCell into 1 method
         /// </summary>
-        /// <param name="clockwiseView">1 dimensional list of the cell view. from GetClockwiseView</param>
-        /// <param name="BotServiceHelpers.MyTerritory">The CellType that defines my bots territory</param>
-        /// <returns>Null if no corner found in the botView</returns>
-        public static CellFinderResult? FindCornerCell(BotView botView)
+        /// <param name="botView"></param>
+        /// <returns></returns>
+        public static CellFinderResult? FindCaptureCell(BotView botView)
+        {
+            BotViewCell centerCell = botView.CenterCell();
+            List<CellFinderResult> allResults = AllCornerCells(botView);
+            allResults.AddRange(AllLineCells(botView));
+
+            return SingleCellFinderResultFromList(allResults, centerCell);
+        }
+
+        private static CellFinderResult? SingleCellFinderResultFromList(List<CellFinderResult> allCells, BotViewCell centerCell)
+        {
+            //standing on cell / return that
+            if (allCells.Any(x => x.Cell.Location == centerCell.Location))
+            {
+                return allCells.First(x => x.Cell.Location == centerCell.Location);
+            }
+            else if (allCells.Count > 0)
+            {
+                //group cells with the same priorities
+                //then pick a random cell from that group
+                var groupedCells = (from cell in allCells
+                                    group cell by new { cell.Priority.DirectionValue, cell.Priority.Distance } into grp
+                                    //coarse distance order, then direction order, then fine distance order
+                                    orderby (grp.Key.Distance / 3) ascending, grp.Key.DirectionValue ascending, grp.Key.Distance ascending
+                                    select grp.ToList()).First();
+
+                Random randCell = new();
+                return groupedCells[randCell.Next(0, groupedCells.Count)];
+            }
+            else return null;
+        }
+
+        private static List<CellFinderResult> AllCornerCells(BotView botView)
         {
             BotViewCell centerCell = botView.CenterCell();
 
@@ -36,16 +68,16 @@ namespace SproutReferenceBot.Services
                     continue;
                 }
 
-                List<BotViewCell> bufferList = botView.CellBufferByLocation(cell.Location);
+                List<BotViewCell> bufferList = cell.Location.CellBuffer();
                 if (bufferList.Any(x => x.HasWeed) && !bufferList.Any(x => x.CellType == CellType.OutOfBounds))
                 {
                     continue;
                 }
 
-                BotViewCell? rightCell = botView.CellByLocation(cell.Location.Move(LocationDirection.Right));
-                BotViewCell? downCell = botView.CellByLocation(cell.Location.Move(LocationDirection.Down));
-                BotViewCell? leftCell = botView.CellByLocation(cell.Location.Move(LocationDirection.Left));
-                BotViewCell? upCell = botView.CellByLocation(cell.Location.Move(LocationDirection.Up));
+                BotViewCell? rightCell = (cell.Location.Move(LocationDirection.Right)).ToBotViewCell();
+                BotViewCell? downCell = (cell.Location.Move(LocationDirection.Down)).ToBotViewCell();
+                BotViewCell? leftCell = (cell.Location.Move(LocationDirection.Left)).ToBotViewCell();
+                BotViewCell? upCell = (cell.Location.Move(LocationDirection.Up)).ToBotViewCell();
 
                 if (rightCell == null || downCell == null || leftCell == null || upCell == null)
                 {
@@ -68,13 +100,14 @@ namespace SproutReferenceBot.Services
                 CellFinderPriority priority = new(centerCell.Location.DistanceTo(cell.Location), centerCell.Location.DirectionPriority(cell.Location, BotServiceGlobals.LastDirection));
                 CellFinderResult cellFinder = new(cell, priority)
                 {
+                    CanCapture = true, //if it is added to the list, CanCapture is true
                     HasPriority = priority.DirectionValue < 0
                 };
 
-                bool canCaptureUp = cellFinder.CanCapture = CanCaptureDirection(cell.Location, LocationDirection.Up, botView);
-                bool canCaptureRight = cellFinder.CanCapture = CanCaptureDirection(cell.Location, LocationDirection.Right, botView);
-                bool canCaptureDown = cellFinder.CanCapture = CanCaptureDirection(cell.Location, LocationDirection.Down, botView);
-                bool canCaptureLeft = CanCaptureDirection(cell.Location, LocationDirection.Left, botView);
+                bool canCaptureUp  = CanCaptureDirection(cell.Location, LocationDirection.Up);
+                bool canCaptureRight = CanCaptureDirection(cell.Location, LocationDirection.Right);
+                bool canCaptureDown = CanCaptureDirection(cell.Location, LocationDirection.Down);
+                bool canCaptureLeft = CanCaptureDirection(cell.Location, LocationDirection.Left);
 
                 //check that this cell has two adjacent cells that are BotServiceHelpers.MyTerritory and the other 2 are not
                 if (rightCell.CellType == BotServiceGlobals.MyTerritory && downCell.CellType == BotServiceGlobals.MyTerritory && leftCell.CellType != BotServiceGlobals.MyTerritory && upCell.CellType != BotServiceGlobals.MyTerritory)
@@ -160,41 +193,54 @@ namespace SproutReferenceBot.Services
                 }
             }
 
-            //Console.WriteLine($"All Corners {centerCell.Location} = {string.Join(", ", allCorners.Select(x => x.Cell.Location))}");
-
-            //standing on corner cell / return that
-            if (allCorners.Any(x => x.Cell.Location == centerCell.Location))
-            {
-                return allCorners.First(x => x.Cell.Location == centerCell.Location);
-            }
-            else if (allCorners.Count > 0)
-            {
-                //group corners with the same priorities
-                //then pick a random corner from that group
-                var groupedCorners = (from corner in allCorners
-                                      group corner by new { corner.Priority.DirectionValue, corner.Priority.Distance } into grp
-                                      orderby (grp.Key.Distance / 3) ascending, grp.Key.DirectionValue ascending
-                                      select grp.ToList()).First();
-
-                Random randCorner = new();
-                return groupedCorners[randCorner.Next(0, groupedCorners.Count)];
-            }
-            else return null;
-        }
-
-        private static bool CanCaptureDirection(Location currentLocation, Location direction, BotView botView)
-        {
-            return BotMovementService.AreMovementActionsSafe(BotMovementService.MoveToDestinationBasic(currentLocation, currentLocation.Move(direction, 4)), botView);
+            return allCorners;
         }
 
         /// <summary>
-        /// From a 1d view find the closest line to the bot. A corner is defined as 3 adjacent cells of BotServiceHelpers.MyTerritory and the remaining cell of a different cell type
+        /// From a 1d view find the closest corner to the bot. A corner is defined as 2 adjacent cells of BotServiceHelpers.MyTerritory and the remaining 2 adjacent cells of another cell type)
         /// </summary>
-        /// <param name="botView"></param>
-        /// <param name="clockwiseView"></param>
-        /// <param name="BotServiceHelpers.MyTerritory"></param>
-        /// <returns></returns>
-        public static CellFinderResult? FindLineCell(BotView botView)
+        /// <param name="clockwiseView">1 dimensional list of the cell view. from GetClockwiseView</param>
+        /// <param name="BotServiceHelpers.MyTerritory">The CellType that defines my bots territory</param>
+        /// <returns>Null if no corner found in the botView</returns>
+        public static CellFinderResult? FindCornerCell(BotView botView)
+        {
+            BotViewCell centerCell = botView.CenterCell();
+            List<CellFinderResult> allCorners = AllCornerCells(botView);
+            return SingleCellFinderResultFromList(allCorners, centerCell);
+        }
+
+        private static bool CanCaptureDirection(Location currentLocation, Location direction)
+        {
+            //add buffer to actual movement lengths (max capture length is 4)
+            int movementLength = 6;
+
+            List<MovementAction> movementActions = BotMovementService.MoveToDestinationBasic(currentLocation, currentLocation.Move(direction, movementLength));
+
+            bool movementSafe = BotMovementService.AreMovementActionsSafe(movementActions);
+
+            if (!movementSafe) return false;
+
+            //avoid capturing into enemy territory near out of bounds. To avoid capturing spawns
+            List<BotViewCell> actionCells = movementActions.ToBotViewCells();
+            if (actionCells.Any(x => x.IsEnemyTerritory))
+            {
+                //look for out of bounds in many directions
+                List<BotViewCell> clockwiseActionCells = BotMovementService.MoveToDestinationBasic(currentLocation, currentLocation.Move(direction.NextClockwiseDirection(), movementLength)).ToBotViewCells();
+                List<BotViewCell> counterClockwiseActionCells = BotMovementService.MoveToDestinationBasic(currentLocation, currentLocation.Move(direction.NextCounterClockwiseDirection(), movementLength)).ToBotViewCells();
+
+                if (actionCells.Any(x => x.CellType == CellType.OutOfBounds) 
+                    || clockwiseActionCells.Any(x => x.CellType == CellType.OutOfBounds) 
+                    || counterClockwiseActionCells.Any(x => x.CellType == CellType.OutOfBounds))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+
+        }
+
+        private static List<CellFinderResult> AllLineCells(BotView botView)
         {
             BotViewCell centerCell = botView.CenterCell();
 
@@ -207,17 +253,17 @@ namespace SproutReferenceBot.Services
                     continue;
                 }
 
-                List<BotViewCell> bufferList = botView.CellBufferByLocation(cell.Location);
+                List<BotViewCell> bufferList = cell.Location.CellBuffer();
                 //ignore lines with weeds
                 if (bufferList.Any(x => x.HasWeed) && !bufferList.Any(x => x.CellType == CellType.OutOfBounds))
                 {
                     continue;
                 }
 
-                BotViewCell? rightCell = botView.CellByLocation(cell.Location.Move(LocationDirection.Right));
-                BotViewCell? downCell = botView.CellByLocation(cell.Location.Move(LocationDirection.Down));
-                BotViewCell? leftCell = botView.CellByLocation(cell.Location.Move(LocationDirection.Left));
-                BotViewCell? upCell = botView.CellByLocation(cell.Location.Move(LocationDirection.Up));
+                BotViewCell? rightCell = (cell.Location.Move(LocationDirection.Right)).ToBotViewCell();
+                BotViewCell? downCell = (cell.Location.Move(LocationDirection.Down)).ToBotViewCell();
+                BotViewCell? leftCell = (cell.Location.Move(LocationDirection.Left)).ToBotViewCell();
+                BotViewCell? upCell = (cell.Location.Move(LocationDirection.Up)).ToBotViewCell();
 
                 if (rightCell == null || downCell == null || leftCell == null || upCell == null)
                 {
@@ -248,7 +294,7 @@ namespace SproutReferenceBot.Services
                         }
 
                         //check that the initial capture path is safe 
-                        cellFinder.CanCapture = CanCaptureDirection(cell.Location, LocationDirection.Up, botView);
+                        cellFinder.CanCapture = CanCaptureDirection(cell.Location, LocationDirection.Up);
                     }
                     else
                     {
@@ -272,7 +318,7 @@ namespace SproutReferenceBot.Services
                         }
 
                         //check that the initial capture path is safe 
-                        cellFinder.CanCapture = CanCaptureDirection(cell.Location, LocationDirection.Right, botView);
+                        cellFinder.CanCapture = CanCaptureDirection(cell.Location, LocationDirection.Right);
                     }
                     else
                     {
@@ -296,7 +342,7 @@ namespace SproutReferenceBot.Services
                         }
 
                         //check that the initial capture path is safe 
-                        cellFinder.CanCapture = CanCaptureDirection(cell.Location, LocationDirection.Down, botView);
+                        cellFinder.CanCapture = CanCaptureDirection(cell.Location, LocationDirection.Down);
 
                     }
                     else
@@ -321,7 +367,7 @@ namespace SproutReferenceBot.Services
                         }
 
                         //check that the initial capture path is safe 
-                        cellFinder.CanCapture = CanCaptureDirection(cell.Location, LocationDirection.Left, botView);
+                        cellFinder.CanCapture = CanCaptureDirection(cell.Location, LocationDirection.Left);
                     }
                     else
                     {
@@ -332,23 +378,21 @@ namespace SproutReferenceBot.Services
                 }
             }
 
-            if (allLines.Any(x => x.Cell.Location == centerCell.Location))
-            {
-                return allLines.First(x => x.Cell.Location == centerCell.Location);
-            }
-            else if (allLines.Count > 0)
-            {
-                //group lines with the same priorities
-                //then pick a random line from that group
-                var groupedLines = (from line in allLines
-                                    group line by new { line.Priority.DirectionValue, Distance = (line.Priority.Distance / 3) } into grp
-                                    orderby grp.Key.DirectionValue ascending, grp.Key.Distance ascending
-                                    select grp.ToList()).First();
+            return allLines;
+        }
 
-                Random randLine = new();
-                return groupedLines[randLine.Next(0, groupedLines.Count)];
-            }
-            else return null;
+        /// <summary>
+        /// From a 1d view find the closest line to the bot. A corner is defined as 3 adjacent cells of BotServiceHelpers.MyTerritory and the remaining cell of a different cell type
+        /// </summary>
+        /// <param name="botView"></param>
+        /// <param name="clockwiseView"></param>
+        /// <param name="BotServiceHelpers.MyTerritory"></param>
+        /// <returns></returns>
+        public static CellFinderResult? FindLineCell(BotView botView)
+        {
+            BotViewCell centerCell = botView.CenterCell();
+            List<CellFinderResult> allLines = AllLineCells(botView);
+            return SingleCellFinderResultFromList(allLines, centerCell);
         }
 
         /// <summary>
@@ -374,15 +418,15 @@ namespace SproutReferenceBot.Services
 
             int myTerritoryCount = 0;
             //move in 1 direction slowly
-            while (botView.CellByLocation(currentLocation) != null)
+            while ((currentLocation).ToBotViewCell() != null)
             {
                 //move in all direction2 for a single direction1
                 //e.g. do all x cells for this y
-                while (botView.CellByLocation(currentLocation) != null)
+                while ((currentLocation).ToBotViewCell() != null)
                 {
                     currentLocation = currentLocation.Move(direction2);
 
-                    if (botView.CellByLocation(currentLocation)?.CellType == BotServiceGlobals.MyTerritory)
+                    if ((currentLocation).ToBotViewCell()?.CellType == BotServiceGlobals.MyTerritory)
                     {
                         myTerritoryCount++;
                     }
@@ -395,6 +439,5 @@ namespace SproutReferenceBot.Services
 
             return myTerritoryCount;
         }
-
     }
 }

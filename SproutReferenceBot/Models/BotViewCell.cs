@@ -1,4 +1,5 @@
 ﻿using SproutReferenceBot.Enums;
+using SproutReferenceBot.Globals;
 using SproutReferenceBot.Services;
 using System;
 using System.Collections.Generic;
@@ -20,6 +21,11 @@ namespace SproutReferenceBot.Models
         public bool IsHazard => HasWeed || (HasBot && !IsMe);
 
         public bool IsTrail => 4 <= (int)CellType && (int)CellType <= 7;
+
+        /// <summary>
+        /// Is Territory cell type but is not mine
+        /// </summary>
+        public bool IsEnemyTerritory => 0 <= (int)CellType && (int)CellType <= 3 && CellType != BotServiceGlobals.MyTerritory;
 
         public BotViewCell()
         {

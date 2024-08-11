@@ -1,4 +1,5 @@
 using SproutReferenceBot.Enums;
+using SproutReferenceBot.Extensions;
 using SproutReferenceBot.Globals;
 using SproutReferenceBot.Models;
 
@@ -16,6 +17,7 @@ public class BotService
     private BotViewCell? centerCell;
 
     private Location? startingLocation;
+    private BotAggression botAggression;
 
     public BotService()
     {
@@ -23,11 +25,14 @@ public class BotService
         movementQueue = [];
         movementActions = [];
         blacklistLocations = [];
+        botAggression = BotAggression.None;
     }
 
     public BotCommand ProcessState()
     {
         hasReceivedBotState = false;
+        centerCell = botView.CenterCell();
+        botAggression = BotAggressionSvc.BotAggressionLevel(botState!.LeaderBoard);
 
         if (BotServiceGlobals.LastDirection == BotAction.IDLE)
         {
@@ -37,7 +42,6 @@ public class BotService
             BotServiceGlobals.Goal = BotGoal.NONE;
         }
 
-        centerCell = botView.CenterCell();
         Console.WriteLine($"Center Cell = {centerCell.Location}");
         //Console.WriteLine($"PowerUps = {botState!.PowerUp}");
         //Console.WriteLine($"Super PowerUps = {botState.SuperPowerUp}");
@@ -53,15 +57,15 @@ public class BotService
             if (BotServiceGlobals.LastDirection != BotAction.IDLE)
             {
                 //check if I actually captured territory. If not mark it as a no go capture. Probably a spawn
-                BotViewCell? behindCell = botView.CellByLocation(centerCell.Location.Move(BotServiceGlobals.LastDirection.ToLocationDirection().OppositeDirection()));
+                BotViewCell? behindCell = (centerCell.Location.Move(BotServiceGlobals.LastDirection.ToLocationDirection().OppositeDirection())).ToBotViewCell();
 
                 if (behindCell != null && behindCell.CellType != BotServiceGlobals.MyTerritory)
                 {
                     //did not capture / blacklist all visible cells of matching type in the botView
-                    foreach(BotViewCell blacklistCell in botView.ClockwiseView.FindAll(x => x.CellType == behindCell.CellType))
+                    foreach (BotViewCell blacklistCell in botView.ClockwiseView.FindAll(x => x.CellType == behindCell.CellType))
                     {
                         //blacklist the buffers as well. To keep clear
-                        foreach(BotViewCell buffer in botView.CellBufferByLocation(blacklistCell.Location))
+                        foreach (BotViewCell buffer in blacklistCell.Location.CellBuffer())
                         {
                             blacklistLocations.Add(buffer.Location);
                         }
@@ -74,85 +78,46 @@ public class BotService
 
 
         BotCommand? botCommand;
-        if (BotServiceGlobals.Goal != BotGoal.MoveAlongLine && BotServiceGlobals.Goal != BotGoal.MoveToLine && BotServiceGlobals.Goal != BotGoal.MoveToCorner)
+        if (BotServiceGlobals.Goal != BotGoal.MoveAlongLine && BotServiceGlobals.Goal != BotGoal.MoveToCaptureCell)
         {
             botCommand = CommandFromQueue();
             if (botCommand != null) return botCommand;
         }
 
-        //get the aggression level for captures
-        BotAggression aggression = BotAggressionSvc.BotAggressionLevel(botState.LeaderBoard);
+        //find a cell that matches BotServiceHelpers.MyTerritory, from which to capture territory
+        CellFinderResult? captureCell = CellFinderService.FindCaptureCell(botView);
 
-        //find a corner that matches BotServiceHelpers.MyTerritory
-        CellFinderResult? cornerCell = CellFinderService.FindCornerCell(botView);
-        CellFinderResult? lineCell = CellFinderService.FindLineCell(botView);
+        Console.WriteLine($"Capture Cell Found = {captureCell?.Cell.Location} == {centerCell.Location} {captureCell != null && captureCell.Cell.Location == centerCell.Location}");
 
-        Console.WriteLine($"Corner Found = {cornerCell?.Cell.Location} == {centerCell.Location} {cornerCell != null && cornerCell.Cell.Location == centerCell.Location}");
-        Console.WriteLine($"Line Found = {lineCell?.Cell.Location}");
-
-        //if there are any other bots within view, don't capture
-        bool anyVisibleBots = botView.ClockwiseView.Any(x => x.HasBot && !x.IsMe);
-        //cannot capture this location, it has been blacklisted previously
-        bool isCaptureBlacklisted = blacklistLocations.Contains(centerCell.Location);
-        //aggression level forbids capturing
-        bool aggressionNotNone = aggression != BotAggression.None;
-
-        //combine above checks
-        bool isCenterCellCapturable = !anyVisibleBots && !isCaptureBlacklisted && aggressionNotNone;
-
-        if (isCenterCellCapturable)
+        if (captureCell != null)
         {
-            if (cornerCell != null && cornerCell.Cell.Location == centerCell.Location)
+            //if there are any other bots within view, don't capture
+            bool anyVisibleBots = botView.ClockwiseView.Any(x => x.HasBot && !x.IsMe);
+            //cannot capture this location, it has been blacklisted previously
+            bool isCaptureBlacklisted = blacklistLocations.Contains(centerCell.Location);
+            //aggression level forbids capturing
+            bool aggressionNotNone = botAggression != BotAggression.None;
+
+            //combine above checks
+            bool isCenterCellCapturable = !anyVisibleBots && !isCaptureBlacklisted && aggressionNotNone;
+
+            if (captureCell.Cell.Location == centerCell.Location)
             {
-                movementQueue = BotMovementService.CaptureTerritory(cornerCell, botView, aggression);
-                BotServiceGlobals.Goal = BotGoal.Capture;
-
-                botCommand = CommandFromQueue();
-                if (botCommand != null) return botCommand;
-            }
-
-            if (lineCell != null && lineCell.Cell.Location == centerCell.Location && lineCell.CanCapture)
-            {
-                movementQueue = BotMovementService.CaptureTerritory(lineCell, botView, aggression);
-                BotServiceGlobals.Goal = BotGoal.Capture;
-
-                botCommand = CommandFromQueue();
-                if (botCommand != null) return botCommand;
-            }
-        }
-
-        if (cornerCell != null)
-        {
-            if (cornerCell.HasPriority || lineCell == null)
-            {
-                movementQueue = new() { new(cornerCell.Cell.Location, new(centerCell.Location.CommonDirection(cornerCell.Cell.Location), centerCell.Location.RotationFromDestination(cornerCell.Cell.Location))) };
-                BotServiceGlobals.Goal = BotGoal.MoveToCorner;
-
-                botCommand = CommandFromQueue();
-                if (botCommand != null) return botCommand;
-            }
-        }
-
-        //can't find a corner. Find a line instead
-        if (lineCell != null)
-        {
-            if (lineCell.Cell.Location == centerCell.Location)
-            {
-                if (lineCell.CanCapture && isCenterCellCapturable)
+                if (captureCell.CanCapture && isCenterCellCapturable)
                 {
-                    movementQueue = BotMovementService.CaptureTerritory(lineCell, botView, aggression);
+                    movementQueue = BotMovementService.CaptureTerritory(captureCell, botAggression);
                     BotServiceGlobals.Goal = BotGoal.Capture;
                 }
                 else
                 {
-                    movementQueue = BotMovementService.MoveAlongLine(lineCell, botView);
+                    movementQueue = BotMovementService.MoveAlongLine(botView);
                     BotServiceGlobals.Goal = BotGoal.MoveAlongLine;
                 }
             }
             else
             {
-                movementQueue = new() { new(lineCell.Cell.Location, lineCell.Directions.First()) };
-                BotServiceGlobals.Goal = BotGoal.MoveToLine;
+                movementQueue = new() { new(captureCell.Cell.Location, captureCell.Directions.First()) };
+                BotServiceGlobals.Goal = BotGoal.MoveToCaptureCell;
             }
         }
 
@@ -167,7 +132,7 @@ public class BotService
 
         //finally travel in a random direction that is safe
         Random randDirection = new();
-        List<BotViewCell> safeCells = botView.CellPrimaryBufferByLocation(centerCell.Location).FindAll(x => !x.IsHazard);
+        List<BotViewCell> safeCells = centerCell.Location.CellPrimaryBuffer().FindAll(x => !x.IsHazard);
 
         if (safeCells.Count > 0)
         {
@@ -194,7 +159,7 @@ public class BotService
             //not capturing and in my territory - look for side tracks within my territory
             if (centerCell!.CellType == BotServiceGlobals.MyTerritory && BotServiceGlobals.Goal != BotGoal.Capture && sideTrackMovementItem == null)
             {
-                List<BotViewCell> coneView = botView.CenterCellConeView(BotServiceGlobals.LastDirection.ToLocationDirection());
+                List<BotViewCell> coneView = botView.CenterCellConeView(BotServiceGlobals.LastDirection.ToLocationDirection(), botAggression);
 
                 if (coneView.Any(x => (x.IsTrail && x.CellType != BotServiceGlobals.MyTrail) || x.PowerUpType != PowerUpType.NONE))
                 {
@@ -208,9 +173,9 @@ public class BotService
                 MovementQueueItem tempMovement = movementQueue.First();
 
                 //Check in the cone view for the newest destination for a side track
-                List<BotViewCell> coneView = botView.CenterCellConeView(tempMovement.Direction.Direction);
+                List<BotViewCell> coneView = botView.CenterCellConeView(tempMovement.Direction.Direction, botAggression);
                 //add a cone view for the current direction as well - less priority
-                coneView.AddRange(botView.CenterCellConeView(BotServiceGlobals.LastDirection.ToLocationDirection()));
+                coneView.AddRange(botView.CenterCellConeView(BotServiceGlobals.LastDirection.ToLocationDirection(), botAggression));
 
                 //get a view of all cells in a line in the last direction
                 List<BotViewCell> lineView = botView.CenterCellDirectionView(BotServiceGlobals.LastDirection.ToLocationDirection());
@@ -234,6 +199,34 @@ public class BotService
             }
         }
 
+        //look out for bots while capturing and abort
+        //unless there is a side track to capture a trail
+        if (botView.ClockwiseView.Any(x => x.HasBot && !x.IsMe)
+            && BotServiceGlobals.Goal == BotGoal.Capture && centerCell!.CellType != BotServiceGlobals.MyTerritory
+            && (movementQueue.Count > 0 || sideTrackMovementItem == null || !(sideTrackMovementItem.Destination.ToBotViewCell()?.IsTrail ?? false && sideTrackMovementItem.Destination.ToBotViewCell()?.CellType != BotServiceGlobals.MyTrail)))
+        {
+            MovementQueueItem? tempMovementItem = movementQueue.FirstOrDefault() ?? sideTrackMovementItem;
+
+            sideTrackMovementItem = null;
+
+            //find the closest myTerritory - by looking in cone view (same as side track)
+            //use High Aggression for max view cone
+
+            //Check in the cone view for the newest destination for a side track
+            List<BotViewCell> coneView = botView.CenterCellConeView(tempMovementItem?.Direction.Direction ?? BotServiceGlobals.LastDirection.ToLocationDirection(), BotAggression.High);
+            //add a cone view for the current direction as well - less priority
+            coneView.AddRange(botView.CenterCellConeView(BotServiceGlobals.LastDirection.ToLocationDirection(), BotAggression.High));
+
+            BotViewCell? myTerritoryCell = coneView.Where(x => x.CellType == BotServiceGlobals.MyTerritory).FirstOrDefault();
+
+            if (myTerritoryCell != null)
+            {
+                movementQueue = [new(myTerritoryCell.Location, new(centerCell!.Location.CommonDirection(myTerritoryCell.Location), tempMovementItem?.Direction.Rotation ?? RotationDirection.Clockwise))];
+            }
+            //else continue with normal queue
+
+            Console.Write($"Aborting Capture - new destination {myTerritoryCell?.Location.ToString() ?? "None"}");
+        }
 
         //queue has items. Move along the queue / or i have a sideTrack
         if (movementQueue.Count > 0 || sideTrackMovementItem != null)
@@ -248,7 +241,7 @@ public class BotService
             {
                 //Reached the side track
                 //or the side track is no longer there
-                BotViewCell? sideTrackCell = botView.CellByLocation(sideTrackMovementItem.Destination);
+                BotViewCell? sideTrackCell = (sideTrackMovementItem.Destination).ToBotViewCell();
                 if (sideTrackMovementItem.Destination == centerCell!.Location
                     || sideTrackCell == null
                     || (!sideTrackCell.IsTrail && sideTrackCell.PowerUpType == PowerUpType.NONE && sideTrackCell.CellType != BotServiceGlobals.MyTerritory))
@@ -285,7 +278,7 @@ public class BotService
                 }
             }
 
-            if (movementActions.Count <= 0 || !movementActions.AreMovementActionsSafe(botView))
+            if (movementActions.Count <= 0 || !movementActions.AreMovementActionsSafe())
             {
                 var moveToDestination = BotMovementService.MoveToDestination(centerCell!.Location, thisMovement.Destination, botView, thisMovement.Direction.Rotation);
                 movementActions = moveToDestination.MovementActions;

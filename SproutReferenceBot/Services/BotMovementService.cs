@@ -1,4 +1,5 @@
 ﻿using SproutReferenceBot.Enums;
+using SproutReferenceBot.Extensions;
 using SproutReferenceBot.Globals;
 using SproutReferenceBot.Models;
 using System;
@@ -73,7 +74,7 @@ namespace SproutReferenceBot.Services
             List<Location> allOffsets = new();
 
             //then check hazards on trail / and avoid
-            while (movementList.Count > 0 && !AreMovementActionsSafe(movementList, botView))
+            while (movementList.Count > 0 && !AreMovementActionsSafe(movementList))
             {
                 MovementAction actionToOffset = movementList.Last();
 
@@ -153,7 +154,7 @@ namespace SproutReferenceBot.Services
 
                 if (possibleMovements.Count > 0)
                 {
-                    MovementAction? newMovement = PrioritiseMovementAction(currentLocation, possibleMovements, botView, lastDirection);
+                    MovementAction? newMovement = PrioritiseMovementAction(currentLocation, possibleMovements, lastDirection);
 
                     if (newMovement != null)
                     {
@@ -188,7 +189,7 @@ namespace SproutReferenceBot.Services
             return movementList;
         }
 
-        private static MovementAction? PrioritiseMovementAction(Location currentLocation, List<MovementAction> possibleActions, BotView botView, BotAction lastDirection)
+        private static MovementAction? PrioritiseMovementAction(Location currentLocation, List<MovementAction> possibleActions, BotAction lastDirection)
         {
             return (from move in possibleActions
                     where PossibleBotAction(move.Action, lastDirection)
@@ -196,7 +197,7 @@ namespace SproutReferenceBot.Services
                     {
                         move,
                         Direction = currentLocation.DirectionPriority(move.Location, lastDirection),
-                        CellType = _PrioritisedCellTypes(botView.CellByLocation(move.Location)),
+                        CellType = _PrioritisedCellTypes(move.Location.ToBotViewCell()),
                     }).OrderBy(x => x.Direction).ThenBy(x => x.CellType).FirstOrDefault()?.move;
 
             static bool PossibleBotAction(BotAction action, BotAction lastDirection)
@@ -232,7 +233,7 @@ namespace SproutReferenceBot.Services
 
             foreach (MovementAction action in actions)
             {
-                BotViewCell? cell = botView.CellByLocation(action.Location);
+                BotViewCell? cell = action.Location.ToBotViewCell();
 
                 if (cell != null)
                 {
@@ -276,14 +277,14 @@ namespace SproutReferenceBot.Services
             }
 
             //if more than 3 sides are hazards then take it out. Can't go in and out safely
-            if (validCells.Any(x => botView.CellPrimaryBufferByLocation(x.Location).Count(x => x.IsHazard) >= 3))
+            if (validCells.Any(x => x.Location.CellPrimaryBuffer().Count(x => x.IsHazard) >= 3))
             {
                 List<BotViewCell> tempCells = new();
                 foreach (BotViewCell cell in validCells)
                 {
                     tempCells.Add(cell);
                     //take out the hazardous cell
-                    if (botView.CellPrimaryBufferByLocation(cell.Location).Count(x => x.IsHazard) < 3)
+                    if (cell.Location.CellPrimaryBuffer().Count(x => x.IsHazard) < 3)
                     {
                         break;
                     }
@@ -315,7 +316,7 @@ namespace SproutReferenceBot.Services
         }
 
 
-        public static List<MovementQueueItem> CaptureTerritory(CellFinderResult cellFinder, BotView botView, BotAggression aggression)
+        public static List<MovementQueueItem> CaptureTerritory(CellFinderResult cellFinder, BotAggression aggression)
         {
             //TODO - use last direction to pick the capture. ORDERBY
 
@@ -323,7 +324,7 @@ namespace SproutReferenceBot.Services
 
             foreach (CellFinderDirection direction in cellFinder.Directions)
             {
-                allQueues.Add(CaptureTerritoryQueue(botView, cellFinder.Cell.Location, direction, aggression));
+                allQueues.Add(CaptureTerritoryQueue(cellFinder.Cell.Location, direction, aggression));
             }
 
             int maxIndex = 0;
@@ -352,7 +353,7 @@ namespace SproutReferenceBot.Services
             return allQueues[maxIndex];
         }
 
-        private static List<MovementQueueItem> CaptureTerritoryQueue(BotView botView, Location cell, CellFinderDirection direction, BotAggression aggression)
+        private static List<MovementQueueItem> CaptureTerritoryQueue(Location cell, CellFinderDirection direction, BotAggression aggression)
         {
             if (aggression == BotAggression.None)
             {
@@ -375,7 +376,7 @@ namespace SproutReferenceBot.Services
                 for (int i = 1; i <= directionMax; i++)
                 {
                     Location cellLocation = currentLocation.Move(currentDirection, i);
-                    cells.Add((cellLocation, botView.CellByLocation(cellLocation)));
+                    cells.Add((cellLocation, cellLocation.ToBotViewCell()));
                 }
 
                 //find a valid destination
@@ -395,13 +396,13 @@ namespace SproutReferenceBot.Services
                     tempLocation = cells.LastOrDefault()?.Location ?? currentLocation;
                 }
 
-                if (botView.CellByLocation(tempLocation)?.CellType != CellType.OutOfBounds && tempLocation != currentDirection)
+                if (tempLocation.ToBotViewCell()?.CellType != CellType.OutOfBounds && tempLocation != currentDirection)
                 {
                     destinationList.Add(new(tempLocation, new(currentDirection, direction.Rotation)));
                     currentLocation = tempLocation;
 
                     //we have hit BotServiceHelpers.MyTerritory, stop capturing
-                    if (botView.CellByLocation(currentLocation)?.CellType == BotServiceGlobals.MyTerritory)
+                    if (currentLocation.ToBotViewCell()?.CellType == BotServiceGlobals.MyTerritory)
                     {
                         break;
                     }
@@ -431,7 +432,7 @@ namespace SproutReferenceBot.Services
                 BotAggression.High => 4,
                 _ => 3
             };
-            
+
             Queue<int> directionLengths = new();
             directionLengths.Enqueue(startingLength);
             directionLengths.Enqueue(startingLength + 2);
@@ -441,21 +442,72 @@ namespace SproutReferenceBot.Services
             return directionLengths;
         }
 
-        public static List<MovementQueueItem> MoveAlongLine(CellFinderResult cellFinder, BotView botView)
+        public static List<MovementQueueItem> MoveAlongLine(BotView botView)
         {
-            Location currentLocation = cellFinder.Cell.Location;
+            Location currentLocation = botView.CenterCell().Location;
+            Location lastDirection = BotServiceGlobals.LastDirection.ToLocationDirection();
+            //move in small increments
+            int directionMagnitude = 2;
 
-            int directionMagnitude = 4;
-            Location tempLocation = currentLocation.Move(cellFinder.Directions.First().Direction, directionMagnitude);
 
-            //stay in bounds
-            while (botView.CellByLocation(tempLocation)?.CellType != BotServiceGlobals.MyTerritory && directionMagnitude > 1)
+            List<BotViewCell> cellBuffer = currentLocation.CellPrimaryBuffer();
+
+            //is line cell
+            if (cellBuffer.Count(x => x.CellType == BotServiceGlobals.MyTerritory) == 3)
             {
-                directionMagnitude--;
-                tempLocation = currentLocation.Move(cellFinder.Directions.First().Direction, directionMagnitude);
+                //cell that is not MyTerritory
+                Location emptyDirection = currentLocation.CommonDirection(cellBuffer.First(x => x.CellType != BotServiceGlobals.MyTerritory).Location);
+
+                if (lastDirection == emptyDirection.NextClockwiseDirection()
+                    || lastDirection == emptyDirection.NextCounterClockwiseDirection())
+                {
+                    //already moving along the line. Keep going
+                    Location moveLocation = MoveAlongLine_InBoundsLocation(currentLocation, lastDirection, directionMagnitude);
+                    return [new(moveLocation, new(lastDirection, RotationDirection.Clockwise))];
+                }
+            }
+            //if not, find a line cell in buffer (then match to clockwise directions)
+            else
+            {
+                //only look at buffer cells that are in current direction, or are left / right
+                List<Location> allowedDirections = [lastDirection, lastDirection.NextClockwiseDirection(), lastDirection.NextCounterClockwiseDirection()];
+
+                foreach (BotViewCell cell in cellBuffer.Where(x => allowedDirections.Contains(currentLocation.CommonDirection(x.Location))))
+                {
+                    //is this buffer cell a line
+                    if (cell.Location.CellPrimaryBuffer().Count(x => x.CellType == BotServiceGlobals.MyTerritory) == 3)
+                    {
+                        //move in the location of the buffer
+                        Location moveLocation = MoveAlongLine_InBoundsLocation(currentLocation, currentLocation.CommonDirection(cell.Location), directionMagnitude);
+                        return [new(moveLocation, new(lastDirection, RotationDirection.Clockwise))];
+                    }
+                }
             }
 
-            return new() { new(tempLocation, cellFinder.Directions.First()) };
+            //else find longest
+            List<(Location location, RotationDirection rotation)> allLocations = [
+                //current direction
+                (MoveAlongLine_InBoundsLocation(currentLocation, lastDirection, directionMagnitude), RotationDirection.Clockwise),
+                //clockwise direction
+                (MoveAlongLine_InBoundsLocation(currentLocation, lastDirection.NextClockwiseDirection(), directionMagnitude), RotationDirection.Clockwise),
+                //counter clockwise direction
+                (MoveAlongLine_InBoundsLocation(currentLocation, lastDirection.NextCounterClockwiseDirection(), directionMagnitude), RotationDirection.CounterClockwise),
+            ];
+
+            //get the location that is the furthest away
+            (Location longestLocation, RotationDirection longestRotation) = allLocations.OrderByDescending(x => currentLocation.DistanceTo(x.location)).First();
+
+            return [new(longestLocation, new(currentLocation.CommonDirection(longestLocation), longestRotation))];
+        }
+
+        private static Location MoveAlongLine_InBoundsLocation(Location currentLocation, Location direction, int directionMagnitude)
+        {
+            Location tempLocation = currentLocation.Move(direction, directionMagnitude);
+
+            List<MovementAction> movementActions = MoveToDestinationBasic(currentLocation, tempLocation);
+
+            //get furthest cell away of celltype MyTerritory
+            return movementActions.LastOrDefault(x => x.GetBotViewCell()?.CellType == BotServiceGlobals.MyTerritory)?.Location ?? currentLocation;
         }
 
         public static bool CanMove(this BotAction currentDirection, BotAction newDirection)
@@ -470,9 +522,9 @@ namespace SproutReferenceBot.Services
             else return true;
         }
 
-        public static bool AreMovementActionsSafe(this List<MovementAction> actions, BotView botView)
+        public static bool AreMovementActionsSafe(this List<MovementAction> actions)
         {
-            List<BotViewCell> actionCells = actions.Where(x => x.GetBotViewCell(botView) != null).Select(x => x.GetBotViewCell(botView)!).ToList();
+            List<BotViewCell> actionCells = actions.ToBotViewCells();
 
             if (actionCells.Any(x => x.IsHazard || (x.IsTrail && x.CellType == BotServiceGlobals.MyTrail)))
             {

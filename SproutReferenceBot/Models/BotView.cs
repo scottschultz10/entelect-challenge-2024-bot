@@ -1,4 +1,5 @@
 ﻿using SproutReferenceBot.Enums;
+using SproutReferenceBot.Extensions;
 using SproutReferenceBot.Globals;
 using System;
 using System.Collections.Generic;
@@ -39,7 +40,9 @@ namespace SproutReferenceBot.Models
         {
             cells = [];
 
-            //my bot will always be in 4, 4. So populate X,Y based on that
+            //my bot will always be in 5, 5. So populate X,Y based on that
+            int centerIndex = ((botState.HeroWindow?.Count ?? 1) - 1) / 2;
+
             int botX = botState.X;
             int botY = botState.Y;
 
@@ -48,8 +51,8 @@ namespace SproutReferenceBot.Models
                 cells.Add([]);
                 for (int y = 0; y < botState.HeroWindow[x].Count; y++)
                 {
-                    int cellY = botY + (y - 4);
-                    int cellX = botX + (x - 4);
+                    int cellY = botY + (y - centerIndex);
+                    int cellX = botX + (x - centerIndex);
 
                     Location cellLocation = new(cellX, cellY);
 
@@ -96,7 +99,7 @@ namespace SproutReferenceBot.Models
 
             List<BotViewCell> clockwiseView = [centerCell];
 
-            BotViewCell? currentCell = CellByLocation(centerCell.Location.Move(LocationDirection.Right));
+            BotViewCell? currentCell = centerCell.Location.Move(LocationDirection.Right).ToBotViewCell();
             Location currentDirection = LocationDirection.Down;
             int directionMax = 1;
             int directionCount = 0;
@@ -121,7 +124,7 @@ namespace SproutReferenceBot.Models
                 }
 
                 directionCount++;
-                currentCell = CellByLocation(currentCell.Location.Move(currentDirection));
+                currentCell = currentCell.Location.Move(currentDirection).ToBotViewCell();
             }
 
             this.clockwiseView = clockwiseView;
@@ -140,10 +143,10 @@ namespace SproutReferenceBot.Models
             int directionMax = 1;
             int directionCount = 0;
 
-            //set to be 2 more spaces than normal bot view. 6 spaces in each direction
-            for (int i = 0; i <= 169; i++)
+            //set to be 2 more spaces than normal bot view. 7 spaces in each direction
+            for (int i = 0; i <= 224; i++)
             {
-                BotViewCell? currentCell = CellByLocation(currentLocation);
+                BotViewCell? currentCell = currentLocation.ToBotViewCell();
 
                 if (currentCell != null)
                 {
@@ -178,7 +181,7 @@ namespace SproutReferenceBot.Models
             return cells[(cells.Count - 1) / 2][(cells[0].Count - 1) / 2];
         }
 
-        public List<BotViewCell> CenterCellConeView(Location direction)
+        public List<BotViewCell> CenterCellConeView(Location direction, BotAggression botAggression)
         {
             BotViewCell centerCell = CenterCell();
 
@@ -189,11 +192,23 @@ namespace SproutReferenceBot.Models
             Location fromLocation = centerCell.Location.Move(fromQuadrant);
             Location toLocation = centerCell.Location.Move(toQuadrant);
 
+            int counter = 0;
+            //limit the size of the Cone view based on aggression levels
+            //5 = normal botview size
+            int maxCounter = (botAggression) switch
+            {
+                BotAggression.High => 99, //no limit
+                BotAggression.Medium => 5, //1 extra space
+                BotAggression.Low => 3, //start limiting
+                BotAggression.None => 2,
+                _ => 5,
+            };
+
             List<BotViewCell> returnView = [];
-            while (CellByLocation(fromLocation) != null || CellByLocation(toLocation) != null)
+            while ((fromLocation.ToBotViewCell() != null || toLocation.ToBotViewCell() != null) && counter <= maxCounter)
             {
                 Location currentLocation = fromLocation;
-                BotViewCell? fromCell = CellByLocation(fromLocation);
+                BotViewCell? fromCell = fromLocation.ToBotViewCell();
                 if (fromCell != null)
                 {
                     returnView.Add(fromCell);
@@ -202,7 +217,7 @@ namespace SproutReferenceBot.Models
                 while (currentLocation != toLocation)
                 {
                     currentLocation = currentLocation.Move(populationDirection);
-                    BotViewCell? currentCell = CellByLocation(currentLocation);
+                    BotViewCell? currentCell = currentLocation.ToBotViewCell();
 
                     if (currentCell != null)
                     {
@@ -212,6 +227,8 @@ namespace SproutReferenceBot.Models
 
                 fromLocation = fromLocation.Move(fromQuadrant);
                 toLocation = toLocation.Move(toQuadrant);
+
+                counter++;
             }
 
             return [.. returnView.OrderBy(x => centerCell.Location.DistanceTo(x.Location)).ThenBy(x => (centerCell.Location.CommonDirection(x.Location) == direction) ? -1 : 1)];
@@ -225,87 +242,13 @@ namespace SproutReferenceBot.Models
             Location currentLocation = CenterCell().Location.Move(direction);
 
             List<BotViewCell> returnView = [];
-            while (CellByLocation(currentLocation) != null)
+            while (currentLocation.ToBotViewCell() != null)
             {
-                returnView.Add(CellByLocation(currentLocation)!);
+                returnView.Add(currentLocation.ToBotViewCell()!);
                 currentLocation = currentLocation.Move(direction);
             }
 
             return returnView;
-        }
-
-        public List<BotViewCell> CellBufferByLocation(Location location)
-        {
-            List<Location> allBuffers =
-            [
-                LocationQuadrant.East,
-                LocationQuadrant.South,
-                LocationQuadrant.West,
-                LocationQuadrant.North,
-                LocationQuadrant.NorthEast,
-                LocationQuadrant.NorthWest,
-                LocationQuadrant.SouthEast,
-                LocationQuadrant.SouthWest,
-                LocationQuadrant.NONE,
-            ];
-
-            List<BotViewCell> returnList = [];
-            foreach (Location buffer in allBuffers)
-            {
-                BotViewCell? bufferCell = CellByLocation(location.Move(buffer));
-                if (bufferCell != null)
-                {
-                    returnList.Add(bufferCell);
-                }
-            }
-
-            return returnList;
-        }
-
-        /// <summary>
-        /// Buffer that only contains the Right, Down, Left, Up values 
-        /// </summary>
-        /// <returns></returns>
-        public List<BotViewCell> CellPrimaryBufferByLocation(Location location)
-        {
-            List<Location> allBuffers =
-            [
-                LocationQuadrant.East,
-                LocationQuadrant.South,
-                LocationQuadrant.West,
-                LocationQuadrant.North,
-            ];
-
-            List<BotViewCell> returnList = [];
-            foreach (Location buffer in allBuffers)
-            {
-                BotViewCell? bufferCell = CellByLocation(location.Move(buffer));
-                if (bufferCell != null)
-                {
-                    returnList.Add(bufferCell);
-                }
-            }
-
-            return returnList;
-        }
-
-        /// <summary>
-        /// Send in a location value and find the associated cell in the BotView
-        /// </summary>
-        /// <param name="location"></param>
-        /// <returns>The BotViewCell associated with the sent in location. If no location is found return null</returns>
-        public BotViewCell? CellByLocation(Location location)
-        {
-            if (BotViewGlobals.EntireView.TryGetValue(location, out (BotViewCell Cell, int Tick) cell))
-            {
-                //check the age of the cell. Do not return old values
-                if (BotServiceGlobals.GameTick <= (cell.Tick + 20))
-                {
-                    return cell.Cell;
-                }
-                else return null;
-            }
-            else return null;
         }
 
         public string PrintBotView()
