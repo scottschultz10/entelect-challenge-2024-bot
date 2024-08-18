@@ -336,5 +336,29 @@ namespace SproutReferenceBot.Extensions
             //only one direction
             return RotationDirection.Clockwise;
         }
+
+        /// <summary>
+        /// if current location is further in the direction than the destination. we have gone past it
+        /// </summary>
+        public static bool HasGonePastDestination(this Location location, Location destination, Location direction)
+        {
+            if (direction == LocationDirection.Up)
+            {
+                return (location.Y < destination.Y);
+            }
+            else if (direction == LocationDirection.Right)
+            {
+                return (location.X > destination.X);
+            }
+            else if (direction == LocationDirection.Down)
+            {
+                return (location.Y > destination.Y);
+            }
+            else if (direction == LocationDirection.Left)
+            {
+                return (location.X < destination.X);
+            }
+            else return false;
+        }
     }
 }

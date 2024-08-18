@@ -20,15 +20,15 @@ namespace SproutReferenceBot.Services
         {
             int leaderboardValue = LeaderboardValue(leaderboard);
             Console.WriteLine($"Leaderboard Value: {leaderboardValue}");
-            if (leaderboardValue <= 20)
+            if (leaderboardValue <= 25)
             {
                 return BotAggression.High;
             }
-            else if (20 < leaderboardValue && leaderboardValue <= 40)
+            else if (25 < leaderboardValue && leaderboardValue <= 45)
             {
                 return BotAggression.Medium;
             }
-            else if (40 < leaderboardValue && leaderboardValue <= 55)
+            else if (45 < leaderboardValue && leaderboardValue <= 65)
             {
                 return BotAggression.Low;
             }
