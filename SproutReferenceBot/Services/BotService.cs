@@ -16,9 +16,6 @@ public class BotService
     private HashSet<Location> blacklistLocations;
     private BotViewCell? centerCell;
 
-    private Location? startingLocation;
-    private BotAggression botAggression;
-
     /// <summary>
     /// if there are any other bots within view, don't capture
     /// </summary>
@@ -34,23 +31,12 @@ public class BotService
         movementQueue = [];
         movementActions = [];
         blacklistLocations = [];
-        botAggression = BotAggression.None;
     }
 
     public BotCommand ProcessState()
     {
         hasReceivedBotState = false;
         centerCell = botView.CenterCell();
-        botAggression = BotAggressionSvc.BotAggressionLevel(botState!.LeaderBoard);
-
-        if (BotServiceGlobals.LastDirection == BotAction.IDLE)
-        {
-            //bot has been reset. Clear everything
-            movementQueue = new();
-            sideTrackMovementItem = null;
-            SideTrackCounter = 0;
-            BotServiceGlobals.Goal = BotGoal.NONE;
-        }
 
         Console.WriteLine($"Center Cell = {centerCell.Location}");
         //Console.WriteLine($"PowerUps = {botState!.PowerUp}");
@@ -83,8 +69,9 @@ public class BotService
                 }
             }
 
-            movementQueue = new();
+            movementQueue = [];
             SideTrackCounter = 0;
+            BotServiceGlobals.Goal = BotGoal.NONE;
         }
 
 
@@ -108,7 +95,7 @@ public class BotService
             //cannot capture this location, it has been blacklisted previously
             bool isCaptureBlacklisted = blacklistLocations.Contains(centerCell.Location);
             //aggression level forbids capturing
-            bool aggressionNotNone = botAggression != BotAggression.None;
+            bool aggressionNotNone = BotServiceGlobals.BotAggression != BotAggression.None;
 
             //combine above checks
             bool isCenterCellCapturable = !AnyVisibleBots && !isCaptureBlacklisted && aggressionNotNone;
@@ -117,7 +104,7 @@ public class BotService
             {
                 if (captureCell.CanCapture && isCenterCellCapturable)
                 {
-                    movementQueue = BotMovementService.CaptureTerritory(captureCell, botAggression);
+                    movementQueue = BotMovementService.CaptureTerritory(captureCell);
                     BotServiceGlobals.Goal = BotGoal.Capture;
                 }
                 else
@@ -137,7 +124,7 @@ public class BotService
         if (botCommand != null) return botCommand;
 
         //return to starting location to try and find something
-        movementQueue = new() { new(startingLocation!, new(centerCell.Location.CommonDirection(startingLocation!), centerCell.Location.RotationFromDestination(startingLocation!))) };
+        movementQueue = new() { new(BotServiceGlobals.StartingLocation!, new(centerCell.Location.CommonDirection(BotServiceGlobals.StartingLocation!), centerCell.Location.RotationFromDestination(BotServiceGlobals.StartingLocation!))) };
 
         botCommand = CommandFromQueue();
         if (botCommand != null) return botCommand;
@@ -166,12 +153,12 @@ public class BotService
 
     private BotCommand? CommandFromQueue()
     {
-        if (BotServiceGlobals.LastDirection != BotAction.IDLE)
+        if (BotServiceGlobals.LastDirection != BotAction.IDLE && BotServiceGlobals.BotAggression != BotAggression.None)
         {
             //not capturing and in my territory - look for side tracks within my territory
             if (centerCell!.CellType == BotServiceGlobals.MyTerritory && BotServiceGlobals.Goal != BotGoal.Capture && sideTrackMovementItem == null)
             {
-                List<BotViewCell> coneView = botView.CenterCellConeView(BotServiceGlobals.LastDirection.ToLocationDirection(), botAggression);
+                List<BotViewCell> coneView = botView.CenterCellConeView(BotServiceGlobals.LastDirection.ToLocationDirection(), BotServiceGlobals.BotAggression);
 
                 if (coneView.Any(x => x.IsTrail && x.CellType != BotServiceGlobals.MyTrail))
                 {
@@ -197,9 +184,9 @@ public class BotService
                 MovementQueueItem tempMovement = movementQueue.First();
 
                 //Check in the cone view for the newest destination for a side track
-                List<BotViewCell> coneView = botView.CenterCellConeView(tempMovement.Direction.Direction, botAggression);
+                List<BotViewCell> coneView = botView.CenterCellConeView(tempMovement.Direction.Direction, BotServiceGlobals.BotAggression);
                 //add a cone view for the current direction as well - less priority
-                coneView.AddRange(botView.CenterCellConeView(BotServiceGlobals.LastDirection.ToLocationDirection(), botAggression));
+                coneView.AddRange(botView.CenterCellConeView(BotServiceGlobals.LastDirection.ToLocationDirection(), BotServiceGlobals.BotAggression));
 
                 //get a view of all cells in a line in the last direction
                 List<BotViewCell> lineView = botView.CenterCellDirectionView(BotServiceGlobals.LastDirection.ToLocationDirection());
@@ -299,7 +286,7 @@ public class BotService
             if (thisMovement == null)
             {
                 thisMovement = movementQueue.First();
-                while (thisMovement.Destination == centerCell!.Location || centerCell.Location.HasGonePastDestination(thisMovement.Destination, thisMovement.Direction.Direction))
+                while (thisMovement.Destination == centerCell!.Location /*|| centerCell.Location.HasGonePastDestination(thisMovement.Destination, thisMovement.Direction.Direction)*/)
                 {
                     //we are at the destination - reset movements
                     //or we have gone past it
@@ -393,10 +380,56 @@ public class BotService
         if (BotServiceGlobals.LastDirection == BotAction.IDLE)
         {
             BotServiceGlobals.MyTerritory = botView.CenterCell().CellType;
-            startingLocation = botView.CenterCell().Location;
+            BotServiceGlobals.StartingLocation = botView.CenterCell().Location;
+
+            //bot has been reset. Clear everything
+            movementQueue = [];
+            sideTrackMovementItem = null;
+            SideTrackCounter = 0;
+            BotServiceGlobals.Goal = BotGoal.NONE;
         }
 
         BotServiceGlobals.GameTick = botState.GameTick;
+        BotServiceGlobals.BotAggression = BotAggressionSvc.BotAggressionLevel(botState.LeaderBoard);
+
+
+        if (BotServiceGlobals.BlacklistLocations.Count == 0)
+        {
+            //set hard coded spawn locations
+
+            /* Formulas for starting positions (from main project)
+             
+            Maybe TODO if the dimensions of the map change
+
+            _startingPositions.Add(new CellCoordinate(_width / 4, 1));
+            _startingPositions.Add(new CellCoordinate(_width - 2, _height / 4));
+            _startingPositions.Add(new CellCoordinate(_width - _width / 4 - 1, _height - 2));
+            _startingPositions.Add(new CellCoordinate(1, _height - _height / 4 - 1));
+             */
+
+            //Currently hard-coded. Assuming the map size is 50x50
+            if (BotServiceGlobals.StartingLocation != null)
+            {
+                if (BotServiceGlobals.StartingLocation != new Location(12, 1))
+                {
+                    BotServiceGlobals.BlacklistLocations.UnionWith(new Location(12, 1).LocationBuffer());
+                }
+                if (BotServiceGlobals.StartingLocation != new Location(48, 12))
+                {
+                    BotServiceGlobals.BlacklistLocations.UnionWith(new Location(48, 12).LocationBuffer());
+                }
+                if (BotServiceGlobals.StartingLocation != new Location(37, 48))
+                {
+                    BotServiceGlobals.BlacklistLocations.UnionWith(new Location(37, 48).LocationBuffer());
+                }
+                if (BotServiceGlobals.StartingLocation != new Location(1, 37))
+                {
+                    BotServiceGlobals.BlacklistLocations.UnionWith(new Location(1, 37).LocationBuffer());
+                }
+            }
+        }
+
+
 
         hasReceivedBotState = true;
     }

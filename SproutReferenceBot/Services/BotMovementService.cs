@@ -106,7 +106,7 @@ namespace SproutReferenceBot.Services
                 List<MovementAction> tempActions = PopulateMovementActions(currentLocation, currentLocation.Difference(offset), botView, lastDirection, captureRotation);
 
                 //can't offset anymore. Change the direction more to allow more offsets
-                if (tempActions.Last().Location == movementList.Last().Location)
+                if (tempActions.Count > 0 && tempActions.Last().Location == movementList.Last().Location)
                 {
                     if (captureRotation == RotationDirection.Clockwise)
                     {
@@ -122,7 +122,7 @@ namespace SproutReferenceBot.Services
                 hasBeenOffset = true;
             }
 
-            return (movementList, hasBeenOffset, movementList.Last().Location.Difference(currentLocation));
+            return (movementList, hasBeenOffset, movementList.LastOrDefault()?.Location.Difference(currentLocation) ?? LocationDirection.NONE);
         }
 
         private static List<MovementAction> PopulateMovementActions(Location currentLocation, Location difference, BotView botView, BotAction lastDirection, RotationDirection? captureRotation)
@@ -316,7 +316,7 @@ namespace SproutReferenceBot.Services
         }
 
 
-        public static List<MovementQueueItem> CaptureTerritory(CellFinderResult cellFinder, BotAggression aggression)
+        public static List<MovementQueueItem> CaptureTerritory(CellFinderResult cellFinder)
         {
             //TODO - use last direction to pick the capture. ORDERBY
 
@@ -324,7 +324,7 @@ namespace SproutReferenceBot.Services
 
             foreach (CellFinderDirection direction in cellFinder.Directions)
             {
-                allQueues.Add(CaptureTerritoryQueue(cellFinder.Cell.Location, direction, aggression));
+                allQueues.Add(CaptureTerritoryQueue(cellFinder.Cell.Location, direction, BotServiceGlobals.BotAggression));
             }
 
             int maxIndex = 0;
@@ -527,6 +527,12 @@ namespace SproutReferenceBot.Services
             List<BotViewCell> actionCells = actions.ToBotViewCells();
 
             if (actionCells.Any(x => x.IsHazard || (x.IsTrail && x.CellType == BotServiceGlobals.MyTrail)))
+            {
+                return false;
+            }
+
+            //check blacklist
+            if (actionCells.Any(x => BotServiceGlobals.BlacklistLocations.TryGetValue(x.Location, out _)))
             {
                 return false;
             }

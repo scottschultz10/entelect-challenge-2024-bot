@@ -42,9 +42,9 @@ namespace SproutReferenceBot.Services
                 //group cells with the same priorities
                 //then pick a random cell from that group
                 var groupedCells = (from cell in allCells
-                                    group cell by new { cell.Priority.DirectionValue, cell.Priority.Distance } into grp
-                                    //coarse distance order, then direction order, then fine distance order
-                                    orderby (grp.Key.Distance / 3) ascending, grp.Key.DirectionValue ascending, grp.Key.Distance ascending
+                                    group cell by new { cell.Priority.DirectionValue, cell.Priority.Distance, CornerValue = cell.IsCorner ? 0 : 1, CaptureValue = cell.CanCapture ? 0 : 1 } into grp
+                                    //Can capture or not, coarse distance order, then direction order, then Corner,, then fine distance order
+                                    orderby grp.Key.CaptureValue ascending, (grp.Key.Distance / 2) ascending, grp.Key.DirectionValue ascending, grp.Key.CornerValue ascending, grp.Key.Distance ascending
                                     select grp.ToList()).First();
 
                 Random randCell = new();
@@ -101,7 +101,8 @@ namespace SproutReferenceBot.Services
                 CellFinderResult cellFinder = new(cell, priority)
                 {
                     CanCapture = true, //if it is added to the list, CanCapture is true
-                    HasPriority = priority.DirectionValue < 0
+                    HasPriority = priority.DirectionValue < 0,
+                    IsCorner = true,
                 };
 
                 bool canCaptureUp  = CanCaptureDirection(cell.Location, LocationDirection.Up);

@@ -18,4 +18,10 @@ internal static class BotServiceGlobals
         _ => CellType.Bot0Trail,
     };
     public static int GameTick { get; set; }
+
+    public static HashSet<Location> BlacklistLocations { get; set; } = [];
+
+    public static Location? StartingLocation { get; set; }
+
+    public static BotAggression BotAggression { get; set; }
 }

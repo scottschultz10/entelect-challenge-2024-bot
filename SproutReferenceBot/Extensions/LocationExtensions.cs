@@ -34,7 +34,7 @@ namespace SproutReferenceBot.Extensions
             {
                 return LocationDirection.Right;
             }
-            else throw new("Direction location not valid");
+            else return LocationDirection.NONE;
         }
 
         public static Location NextCounterClockwiseDirection(this Location direction)
@@ -55,7 +55,7 @@ namespace SproutReferenceBot.Extensions
             {
                 return LocationDirection.Right;
             }
-            else throw new("Direction location not valid");
+            else return LocationDirection.NONE;
         }
 
         /// <summary>
@@ -121,7 +121,7 @@ namespace SproutReferenceBot.Extensions
             {
                 return BotAction.Up;
             }
-            else throw new("Direction location not valid");
+            else return BotAction.IDLE;
         }
 
         public static Location ToLocationDirection(this BotAction action)
@@ -142,7 +142,7 @@ namespace SproutReferenceBot.Extensions
             {
                 return LocationDirection.Up;
             }
-            else throw new("Bot Action not valid");
+            else return LocationDirection.NONE;
         }
 
         public static int DistanceTo(this Location from, Location to)
@@ -159,7 +159,7 @@ namespace SproutReferenceBot.Extensions
 
             if (currentDirection == BotAction.Up)
             {
-                //don't want to move down (don't want to increase the X value)
+                //don't want to move down (don't want to increase the Y value)
                 if (difference.Y < 0)
                 {
                     return 1;
@@ -167,13 +167,13 @@ namespace SproutReferenceBot.Extensions
                 else if (difference.Y > 0)
                 {
                     //keep going up
-                    return -1;
+                    return -2;
                 }
-                else return -2;
+                else return -1;
             }
             else if (currentDirection == BotAction.Down)
             {
-                //don't want to move up (don't want to decrease the X value)
+                //don't want to move up (don't want to decrease the Y value)
                 if (difference.Y > 0)
                 {
                     return 1;
@@ -181,9 +181,9 @@ namespace SproutReferenceBot.Extensions
                 else if (difference.Y < 0)
                 {
                     //keep going down
-                    return -1;
+                    return -2;
                 }
-                else return -2;
+                else return -1;
             }
             else if (currentDirection == BotAction.Left)
             {
@@ -195,9 +195,9 @@ namespace SproutReferenceBot.Extensions
                 else if (difference.X > 0)
                 {
                     //keep going left
-                    return -1;
+                    return -2;
                 }
-                else return -2;
+                else return -1;
             }
             else if (currentDirection == BotAction.Right)
             {
@@ -208,9 +208,9 @@ namespace SproutReferenceBot.Extensions
                 }
                 else if (difference.X < 0)
                 {
-                    return -1;
+                    return -2;
                 }
-                else return -2;
+                else return -1;
             }
             else return 0;
         }
@@ -340,6 +340,7 @@ namespace SproutReferenceBot.Extensions
         /// <summary>
         /// if current location is further in the direction than the destination. we have gone past it
         /// </summary>
+        
         public static bool HasGonePastDestination(this Location location, Location destination, Location direction)
         {
             if (direction == LocationDirection.Up)
@@ -360,5 +361,31 @@ namespace SproutReferenceBot.Extensions
             }
             else return false;
         }
+
+        
+        public static List<Location> LocationBuffer(this Location location)
+        {
+            List<Location> allBuffers =
+            [
+                LocationQuadrant.East,
+                LocationQuadrant.South,
+                LocationQuadrant.West,
+                LocationQuadrant.North,
+                LocationQuadrant.NorthEast,
+                LocationQuadrant.NorthWest,
+                LocationQuadrant.SouthEast,
+                LocationQuadrant.SouthWest,
+                LocationQuadrant.NONE,
+            ];
+
+            List<Location> returnList = [];
+            foreach (Location buffer in allBuffers)
+            {
+                returnList.Add(location.Move(buffer));
+            }
+
+            return returnList;
+        }
+
     }
 }

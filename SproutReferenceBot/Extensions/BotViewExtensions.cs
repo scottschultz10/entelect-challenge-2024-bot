@@ -28,7 +28,7 @@ namespace SproutReferenceBot.Extensions
             {
                 //check the age of the cell. Do not return old values
                 //out of bounds will never change
-                if (BotServiceGlobals.GameTick <= (cell.Tick + 25) || cell.Cell.CellType == CellType.OutOfBounds)
+                if (BotServiceGlobals.GameTick <= (cell.Tick + 20) || cell.Cell.CellType == CellType.OutOfBounds)
                 {
                     return cell.Cell;
                 }

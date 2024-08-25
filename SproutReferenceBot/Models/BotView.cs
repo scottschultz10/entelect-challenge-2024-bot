@@ -197,8 +197,8 @@ namespace SproutReferenceBot.Models
             //5 = normal botview size
             int maxCounter = (botAggression) switch
             {
-                BotAggression.High => 99, //no limit
-                BotAggression.Medium => 5, //1 extra space
+                BotAggression.High => 7, //high limit +2
+                BotAggression.Medium => 5, //default
                 BotAggression.Low => 3, //start limiting
                 BotAggression.None => 2,
                 _ => 5,

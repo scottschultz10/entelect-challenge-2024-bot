@@ -28,12 +28,12 @@ namespace SproutReferenceBot.Models
             return X == compare.X && Y == compare.Y;
         }
 
-        public static bool operator ==(Location lhs, Location rhs)
+        public static bool operator ==(Location? lhs, Location? rhs)
         {
             return Equals(lhs, rhs);
         }
 
-        public static bool operator !=(Location lhs, Location rhs)
+        public static bool operator !=(Location? lhs, Location? rhs)
         {
             return !Equals(lhs, rhs);
         }

@@ -136,7 +136,7 @@ namespace SproutReferenceBot.Models
             {
                 return East;
             }
-            else throw new("Direction location not valid");
+            else return NONE;
         }
 
         public static Location NextCounterClockwiseQuadrant(this Location quadrant)
@@ -173,7 +173,7 @@ namespace SproutReferenceBot.Models
             {
                 return East;
             }
-            else throw new("Direction location not valid");
+            else return NONE;
         }
 
     }
