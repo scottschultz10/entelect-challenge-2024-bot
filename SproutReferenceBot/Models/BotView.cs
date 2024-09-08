@@ -200,7 +200,7 @@ namespace SproutReferenceBot.Models
                 BotAggression.High => 7, //high limit +2
                 BotAggression.Medium => 5, //default
                 BotAggression.Low => 3, //start limiting
-                BotAggression.None => 2,
+                BotAggression.None => -1, //No Sidetracking 
                 _ => 5,
             };
 

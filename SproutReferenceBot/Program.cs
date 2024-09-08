@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using SproutReferenceBot.Models;
 using SproutReferenceBot.Services;
+using System.Diagnostics;
 
 var builder = new ConfigurationBuilder().AddJsonFile(
     $"appsettings.json",
@@ -92,8 +93,12 @@ while (connection.State == HubConnectionState.Connected || connection.State == H
 {
     if (botService.HasReceivedBotState() && connection.State == HubConnectionState.Connected)
     {
+        Stopwatch stopwatch = new();
+        stopwatch.Start();
         BotCommand command = botService.ProcessState();
 
+        stopwatch.Stop();
+        Console.WriteLine($"Time Elapsed: {stopwatch.Elapsed}");
         //Console.WriteLine(botService.PrintBotView());
         await connection.InvokeAsync("SendPlayerCommand", command);
     }

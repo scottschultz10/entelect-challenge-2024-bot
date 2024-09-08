@@ -108,6 +108,31 @@ namespace SproutReferenceBot.Services
                 //can't offset anymore. Change the direction more to allow more offsets
                 if (tempActions.Count > 0 && tempActions.Last().Location == movementList.Last().Location)
                 {
+                    //offset in current rotation if low aggression - if clockwise - offset clockwise
+                    //else offset in opposite rotation if high aggression (legacy offset) - if clockwise - offset counter clockwise
+                    //if (captureRotation == RotationDirection.Clockwise)
+                    //{
+                    //    if (BotServiceGlobals.BotAggression == BotAggression.Low || BotServiceGlobals.BotAggression == BotAggression.None)
+                    //    {
+                    //        offsetDirection = offsetDirection.NextClockwiseDirection();
+                    //    }
+                    //    else
+                    //    {
+                    //        offsetDirection = offsetDirection.NextCounterClockwiseDirection();
+                    //    }
+                    //}
+                    //else
+                    //{
+                    //    if (BotServiceGlobals.BotAggression == BotAggression.Low || BotServiceGlobals.BotAggression == BotAggression.None)
+                    //    {
+                    //        offsetDirection = offsetDirection.NextCounterClockwiseDirection();
+                    //    }
+                    //    else
+                    //    {
+                    //        offsetDirection = offsetDirection.NextClockwiseDirection();
+                    //    }
+                    //}
+
                     if (captureRotation == RotationDirection.Clockwise)
                     {
                         offsetDirection = offsetDirection.NextCounterClockwiseDirection();
