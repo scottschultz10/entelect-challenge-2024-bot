@@ -24,11 +24,11 @@ namespace SproutReferenceBot.Services
             {
                 return BotAggression.High;
             }
-            else if (25 < leaderboardValue && leaderboardValue <= 45)
+            else if (25 < leaderboardValue && leaderboardValue <= 40)
             {
                 return BotAggression.Medium;
             }
-            else if (45 < leaderboardValue && leaderboardValue <= 65)
+            else if (40 < leaderboardValue && leaderboardValue <= 60)
             {
                 return BotAggression.Low;
             }
