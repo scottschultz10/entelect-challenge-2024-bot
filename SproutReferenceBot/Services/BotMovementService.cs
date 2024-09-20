@@ -54,14 +54,14 @@ namespace SproutReferenceBot.Services
             return movementList;
         }
 
-        public static (List<MovementAction> MovementActions, bool HasBeenOffset, Location OffsetDifference) MoveToDestination(Location current, Location destination, BotView botView, RotationDirection? captureRotation)
+        public static (List<MovementAction> MovementActions, bool HasBeenOffset, Location OffsetDifference) MoveToDestination(Location current, Location destination, RotationDirection? captureRotation)
         {
             //make the basic movement first
             Location difference = current.Difference(destination);
             Location currentLocation = current;
             BotAction lastDirection = BotServiceGlobals.LastDirection;
 
-            List<MovementAction> movementList = PopulateMovementActions(currentLocation, difference, botView, lastDirection, captureRotation);
+            List<MovementAction> movementList = PopulateMovementActions(currentLocation, difference, lastDirection, captureRotation, false);
 
             if (lastDirection == BotAction.IDLE)
             {
@@ -103,7 +103,7 @@ namespace SproutReferenceBot.Services
                 allOffsets.Add(offset);
 
                 //populate from current to offset
-                List<MovementAction> tempActions = PopulateMovementActions(currentLocation, currentLocation.Difference(offset), botView, lastDirection, captureRotation);
+                List<MovementAction> tempActions = PopulateMovementActions(currentLocation, currentLocation.Difference(offset), lastDirection, captureRotation, true);
 
                 //can't offset anymore. Change the direction more to allow more offsets
                 if (tempActions.Count > 0 && tempActions.Last().Location == movementList.Last().Location)
@@ -150,7 +150,7 @@ namespace SproutReferenceBot.Services
             return (movementList, hasBeenOffset, movementList.LastOrDefault()?.Location.Difference(currentLocation) ?? LocationDirection.NONE);
         }
 
-        private static List<MovementAction> PopulateMovementActions(Location currentLocation, Location difference, BotView botView, BotAction lastDirection, RotationDirection? captureRotation)
+        private static List<MovementAction> PopulateMovementActions(Location currentLocation, Location difference, BotAction lastDirection, RotationDirection? captureRotation, bool inverseDirectionPriority)
         {
             List<MovementAction> movementList = new();
 
@@ -179,7 +179,7 @@ namespace SproutReferenceBot.Services
 
                 if (possibleMovements.Count > 0)
                 {
-                    MovementAction? newMovement = PrioritiseMovementAction(currentLocation, possibleMovements, lastDirection);
+                    MovementAction? newMovement = PrioritiseMovementAction(currentLocation, possibleMovements, lastDirection, inverseDirectionPriority);
 
                     if (newMovement != null)
                     {
@@ -214,16 +214,25 @@ namespace SproutReferenceBot.Services
             return movementList;
         }
 
-        private static MovementAction? PrioritiseMovementAction(Location currentLocation, List<MovementAction> possibleActions, BotAction lastDirection)
+        private static MovementAction? PrioritiseMovementAction(Location currentLocation, List<MovementAction> possibleActions, BotAction lastDirection, bool inverseDirectionPriority)
         {
-            return (from move in possibleActions
-                    where PossibleBotAction(move.Action, lastDirection)
-                    select new
-                    {
-                        move,
-                        Direction = currentLocation.DirectionPriority(move.Location, lastDirection),
-                        CellType = _PrioritisedCellTypes(move.Location.ToBotViewCell()),
-                    }).OrderBy(x => x.Direction).ThenBy(x => x.CellType).FirstOrDefault()?.move;
+            var tempList = (from move in possibleActions
+                               where PossibleBotAction(move.Action, lastDirection)
+                               select new
+                               {
+                                   move,
+                                   Direction = currentLocation.DirectionPriority(move.Location, lastDirection),
+                                   CellType = _PrioritisedCellTypes(move.Location.ToBotViewCell()),
+                               });
+
+            if (inverseDirectionPriority)
+            {
+                return tempList.OrderByDescending(x => x.Direction).ThenBy(x => x.CellType).FirstOrDefault()?.move;
+            }
+            else
+            {
+                return tempList.OrderBy(x => x.Direction).ThenBy(x => x.CellType).FirstOrDefault()?.move;
+            }
 
             static bool PossibleBotAction(BotAction action, BotAction lastDirection)
             {

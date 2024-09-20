@@ -211,7 +211,7 @@ public class BotService
 
             if (movementActions.Count <= 0 || !movementActions.AreMovementActionsSafe())
             {
-                var moveToDestination = BotMovementService.MoveToDestination(centerCell!.Location, thisMovement.Destination, botView, thisMovement.Direction.Rotation);
+                var moveToDestination = BotMovementService.MoveToDestination(centerCell!.Location, thisMovement.Destination, thisMovement.Direction.Rotation);
                 movementActions = moveToDestination.MovementActions;
 
                 //TODO
@@ -294,6 +294,9 @@ public class BotService
                 {
                     //movementQueue[0].Destination = movementQueue[0].Destination.MoveOffset(sideTrackMovementItem.Destination.Difference(movementQueue[0].Destination), movementQueue[0].Direction.Direction);
 
+                    //offset the next item in the queue. Move index 1 by the offset from sidetrack to index 0
+                    movementQueue[1].Destination = movementQueue[1].Destination.MoveOffsetSecondary(sideTrackMovementItem.Destination.Difference(movementQueue[0].Destination), movementQueue[0].Direction.Direction);
+
                     //remove the first movementQueue item
                     movementQueue.RemoveAt(0);
                 }
@@ -336,6 +339,9 @@ public class BotService
                 if (sideTrackMovementItem != null && movementQueue.Count > 1)
                 {
                     //movementQueue[0].Destination = movementQueue[0].Destination.MoveOffset(sideTrackMovementItem.Destination.Difference(movementQueue[0].Destination), movementQueue[0].Direction.Direction);
+                    
+                    //offset the next item in the queue. Move index 1 by the offset from sidetrack to index 0
+                    movementQueue[1].Destination = movementQueue[1].Destination.MoveOffsetSecondary(sideTrackMovementItem.Destination.Difference(movementQueue[0].Destination), movementQueue[0].Direction.Direction);
 
                     //remove the first movementQueue item
                     movementQueue.RemoveAt(0);

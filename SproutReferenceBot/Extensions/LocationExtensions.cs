@@ -66,7 +66,7 @@ namespace SproutReferenceBot.Extensions
         {
             return new(location.X + (direction.X * magnitude), location.Y + (direction.Y * magnitude));
         }
-
+        
         /// <summary>
         /// Offset the location by only 1 cardinal. So don't go longer just wider for example
         /// </summary>
@@ -86,6 +86,35 @@ namespace SproutReferenceBot.Extensions
             {
                 //only offset on X axis
                 actualOffset = new(offset.X, 0);
+            }
+            else
+            {
+                actualOffset = offset;
+            }
+
+            return location.Move(actualOffset);
+        }
+
+
+        /// <summary>
+        /// Offset the location by only 1 cardinal. So don't go longer just wider for example. Intended to be a secondary offset to the first destination move offset 
+        /// </summary>
+        /// <param name="location">Location to be offset</param>
+        /// <param name="offset">The Offset</param>
+        /// <param name="direction">The Main direction, from CellFinderResult</param>
+        /// <returns></returns>
+        public static Location MoveOffsetSecondary(this Location location, Location offset, Location direction)
+        {
+            Location actualOffset;
+            if (direction == LocationDirection.Left || direction == LocationDirection.Right)
+            {
+                //only offset on X axis, after a turn move the location2 inline with location1
+                actualOffset = new(offset.X, 0);
+            }
+            else if (direction == LocationDirection.Up || direction == LocationDirection.Down)
+            {
+                //only offset on Y axis, after a turn move the location2 inline with location1
+                actualOffset = new(0, offset.Y);
             }
             else
             {
