@@ -29,7 +29,7 @@ jobs:
       - name: build-project
         run: dotnet publish --configuration Release --output ./publish/
       - name: upload-build-files
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: build-files
           path: ./publish/*
@@ -40,7 +40,7 @@ jobs:
       - name: Checkout code into workspace directory
         uses: actions/checkout@v2
       - name: download-build-files
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: build-files
           path: ${{ github.workspace }}/publish
@@ -71,7 +71,7 @@ jobs:
       - name: Checkout code into workspace directory
         uses: actions/checkout@v2
       - name: download build-files
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: build-files
           path: ${{ github.workspace }}/publish
